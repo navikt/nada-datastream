@@ -14,11 +14,11 @@ func (g *Google) EnableAPIs(ctx context.Context) error {
 
 	for _, a := range apis {
 		g.log.Infof("Enabling API %v...", a)
-		_, err := g.performRequest(ctx, []string{
+		err := g.performRequest(ctx, []string{
 			"services",
 			"enable",
 			a,
-		})
+		}, nil)
 		if err != nil {
 			g.log.WithError(err).Errorf("enabling api %v", a)
 			return err

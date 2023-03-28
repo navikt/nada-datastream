@@ -2,7 +2,6 @@ package google
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 )
 
@@ -21,18 +20,13 @@ func (g *Google) CreateVPC(ctx context.Context) error {
 		return nil
 	}
 
-	g.log.Info("Creating VPC...")
-	_, err = g.performRequest(ctx, []string{
-		"compute",
-		"networks",
-		"create",
-		vpcName,
-	})
-	if err != nil {
-		g.log.WithError(err).Errorf("creating vpc %v", vpcName)
+	if err := g.createVPC(ctx); err != nil {
 		return err
 	}
-	g.log.Info("Done")
+
+	if err := g.enablePrivateGoogleAccessForVMSubnet(ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -50,23 +44,64 @@ func (g *Google) PreparePrivateServiceConnectivity(ctx context.Context) error {
 }
 
 func (g *Google) vpcExists(ctx context.Context) (bool, error) {
-	vpcs, err := g.performRequest(ctx, []string{
+	type vpc struct {
+		Name string `json:"name"`
+	}
+	vpcs := []*vpc{}
+
+	err := g.performRequest(ctx, []string{
 		"compute",
 		"networks",
 		"list",
-	})
+	}, &vpcs)
 	if err != nil {
 		g.log.WithError(err).Errorf("listing VPCs in project %v", g.project)
 		return false, err
 	}
 
 	for _, existing := range vpcs {
-		if existing["name"] == vpcName {
+		if existing.Name == vpcName {
 			return true, nil
 		}
 	}
 
 	return false, nil
+}
+
+func (g *Google) createVPC(ctx context.Context) error {
+	g.log.Info("Creating VPC...")
+	err := g.performRequest(ctx, []string{
+		"compute",
+		"networks",
+		"create",
+		vpcName,
+	}, nil)
+	if err != nil {
+		g.log.WithError(err).Errorf("creating vpc %v", vpcName)
+		return err
+	}
+	g.log.Info("Done")
+
+	return nil
+}
+
+func (g *Google) enablePrivateGoogleAccessForVMSubnet(ctx context.Context) error {
+	g.log.Info("Enabling Private Google Access...")
+	err := g.performRequest(ctx, []string{
+		"compute",
+		"networks",
+		"subnets",
+		"update",
+		vpcName,
+		fmt.Sprintf("--region=%v", g.region),
+		"--enable-private-ip-google-access",
+	}, nil)
+	if err != nil {
+		return err
+	}
+	g.log.Info("Done")
+
+	return nil
 }
 
 func (g *Google) createAddressRange(ctx context.Context) error {
@@ -79,7 +114,7 @@ func (g *Google) createAddressRange(ctx context.Context) error {
 	}
 
 	g.log.Info("Creating private address range for cloudsql...")
-	_, err = g.performRequest(ctx, []string{
+	err = g.performRequest(ctx, []string{
 		"compute",
 		"addresses",
 		"create",
@@ -88,7 +123,7 @@ func (g *Google) createAddressRange(ctx context.Context) error {
 		"--purpose=VPC_PEERING",
 		"--prefix-length=24",
 		fmt.Sprintf("--network=%v", vpcName),
-	})
+	}, nil)
 	if err != nil {
 		g.log.WithError(err).Errorf("creating private address range for cloudsql instance", g.instance)
 		return err
@@ -99,18 +134,23 @@ func (g *Google) createAddressRange(ctx context.Context) error {
 }
 
 func (g *Google) addressRangeExists(ctx context.Context) (bool, error) {
-	addressRanges, err := g.performRequest(ctx, []string{
+	type AddressRange struct {
+		Name string `json:"name"`
+	}
+	addressRanges := []*AddressRange{}
+
+	err := g.performRequest(ctx, []string{
 		"compute",
 		"addresses",
 		"list",
-	})
+	}, &addressRanges)
 	if err != nil {
 		g.log.WithError(err).Errorf("listing addresses in project %v", g.project)
 		return false, err
 	}
 
 	for _, ar := range addressRanges {
-		if ar["name"] == addressRangeName {
+		if ar.Name == addressRangeName {
 			return true, nil
 		}
 	}
@@ -128,7 +168,7 @@ func (g *Google) createPeering(ctx context.Context) error {
 	}
 
 	g.log.Info("Create peering between VPC and cloudsql private range...")
-	_, err = g.performRequest(ctx, []string{
+	err = g.performRequest(ctx, []string{
 		"services",
 		"vpc-peerings",
 		"update",
@@ -136,7 +176,7 @@ func (g *Google) createPeering(ctx context.Context) error {
 		fmt.Sprintf("--network=%v", vpcName),
 		fmt.Sprintf("--ranges=%v", addressRangeName),
 		"--force",
-	})
+	}, nil)
 	if err != nil {
 		g.log.WithError(err).Errorf("creating peering between VPC %v and cloudsql private range %v", vpcName, addressRangeName)
 		return err
@@ -150,29 +190,21 @@ func (g *Google) peeringExists(ctx context.Context) (bool, error) {
 	type peeringRes struct {
 		ReservedPeeringRanges []string `json:"reservedPeeringRanges"`
 	}
+	peerings := []*peeringRes{}
 
-	peerings, err := g.performRequest(ctx, []string{
+	err := g.performRequest(ctx, []string{
 		"services",
 		"vpc-peerings",
 		"list",
 		fmt.Sprintf("--network=%v", vpcName),
-	})
+	}, &peerings)
 	if err != nil {
 		g.log.WithError(err).Errorf("listing peerings for VPC %v", vpcName)
 		return false, err
 	}
 
 	for _, p := range peerings {
-		pBytes, err := json.Marshal(p)
-		if err != nil {
-			return false, err
-		}
-		pRes := peeringRes{}
-		if err := json.Unmarshal(pBytes, &pRes); err != nil {
-			return false, err
-		}
-
-		if contains(pRes.ReservedPeeringRanges, addressRangeName) {
+		if contains(p.ReservedPeeringRanges, addressRangeName) {
 			return true, nil
 		}
 	}

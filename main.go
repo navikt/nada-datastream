@@ -28,4 +28,16 @@ func main() {
 	if err := googleClient.PatchCloudSQLInstance(ctx); err != nil {
 		log.Fatal(err)
 	}
+
+	if err := googleClient.CreateCloudSQLProxy(ctx); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := googleClient.CreateDatastreamPrivateConnection(ctx); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := googleClient.CreateDatastreamProfiles(ctx); err != nil {
+		log.Fatal(err)
+	}
 }

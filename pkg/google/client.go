@@ -23,6 +23,7 @@ type PostgresDB struct {
 	db       string
 	user     string
 	password string
+	port     string
 }
 
 type Google struct {
@@ -37,16 +38,21 @@ func New(log *logrus.Entry) *Google {
 		log:     log,
 		project: "nada-dev-db2e",
 		PostgresDB: PostgresDB{
-			instance: "ds-test",
+			instance: "datastream",
 			region:   "europe-north1",
-			db:       "ds",
-			user:     "datastream",
-			password: "",
+			db:       "datastream",      // hent fra secret i clusteret
+			user:     "datastream_read", // hent fra secret i clusteret
+			password: "<replace me>",    // hent fra secret i clusteret
+			port:     "5432",
 		},
 	}
 }
 
-func (g *Google) performRequest(ctx context.Context, args []string) ([]map[string]any, error) {
+func (g *Google) performRequest(ctx context.Context, args []string, out any) error {
+	if out == nil {
+		out = []map[string]any{}
+	}
+
 	args = append(args, fmt.Sprintf("--project=%v", g.project))
 	args = append(args, "--format=json")
 
@@ -63,13 +69,12 @@ func (g *Google) performRequest(ctx context.Context, args []string) ([]map[strin
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		io.Copy(os.Stdout, buf)
-		return nil, err
+		return err
 	}
 
-	var out []map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
-		return nil, err
+		return err
 	}
 
-	return out, nil
+	return nil
 }
