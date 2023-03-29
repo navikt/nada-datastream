@@ -15,12 +15,12 @@ spec:
     sqlInstances:
     - name: myinstance
       flags:
-      - name: cloudsql.logical_decoding
-        value: "on"
+      - name: cloudsql.logical_decoding # flagget som må settes
+        value: "on" # flagget som må settes
       databases:
       - name: mydatabase
         users:
-        - name: datastream
+        - name: datastream # ekstra databasebruker
 ... 
 ````
 
@@ -28,11 +28,21 @@ Videre må man legge til en databasemigrasjon som sørger for at den nyoppretted
 
 Migrasjonen må også gi den nyopprettede brukeren `REPLICATION` rolle i databasen og lage en [publication og replication slot](https://cloud.google.com/datastream/docs/configure-your-source-postgresql-database#create_a_publication_and_a_replication_slot_2).
 ````sql
-ALTER DEFAULT PRIVILIGES IN SCHEMA PUBLIC GRANT SELECT ON TABLES TO "datastream";
+ALTER DEFAULT PRIVILEGES IN SCHEMA PUBLIC GRANT SELECT ON TABLES TO "datastream";
 GRANT SELECT ON ALL TABLES IN SCHEMA PUBLIC TO "datastream";
 
+ALTER USER "appnavn" WITH REPLICATION;
 ALTER USER "datastream" WITH REPLICATION;
 CREATE PUBLICATION "ds_publication" FOR ALL TABLES;
 SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('ds_replication', 'pgoutput');
 ````
-    
+Merk: både appens bruker og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
+
+## Sett opp datastream kobling
+Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Editor` rolle i prosjektet.
+
+For å sette opp datastream kjør så følgende:
+
+````bash
+./bin/nada-datastream --project=<gcp prosjekt> --instance=<instans navn> --db=<db navn> --user=<bruker> --password=<passord>
+````

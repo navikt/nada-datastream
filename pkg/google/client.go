@@ -17,34 +17,27 @@ const (
 	gcloudTimeout = 25 * time.Minute
 )
 
-type PostgresDB struct {
-	instance string
-	region   string
-	db       string
-	user     string
-	password string
-	port     string
+type Config struct {
+	Instance          string
+	Region            string
+	DB                string
+	User              string
+	Password          string
+	Port              string
+	Project           string
+	CloudSQLPrivateIP bool
 }
 
 type Google struct {
-	PostgresDB
+	Config
 
-	project string
-	log     *logrus.Entry
+	log *logrus.Entry
 }
 
-func New(log *logrus.Entry) *Google {
+func New(log *logrus.Entry, cfg Config) *Google {
 	return &Google{
-		log:     log,
-		project: "nada-dev-db2e",
-		PostgresDB: PostgresDB{
-			instance: "datastream",
-			region:   "europe-north1",
-			db:       "datastream",      // hent fra secret i clusteret
-			user:     "datastream_read", // hent fra secret i clusteret
-			password: "<replace me>",    // hent fra secret i clusteret
-			port:     "5432",
-		},
+		log:    log,
+		Config: cfg,
 	}
 }
 
@@ -53,7 +46,7 @@ func (g *Google) performRequest(ctx context.Context, args []string, out any) err
 		out = []map[string]any{}
 	}
 
-	args = append(args, fmt.Sprintf("--project=%v", g.project))
+	args = append(args, fmt.Sprintf("--project=%v", g.Project))
 	args = append(args, "--format=json")
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, gcloudTimeout)

@@ -28,11 +28,11 @@ func (g *Google) PatchCloudSQLInstance(ctx context.Context) error {
 		"sql",
 		"instances",
 		"patch",
-		g.instance,
+		g.Instance,
 		fmt.Sprintf("--network=%v", vpcName),
 	}, nil)
 	if err != nil {
-		g.log.WithError(err).Errorf("patching sql instance %v", g.instance)
+		g.log.WithError(err).Errorf("patching sql instance %v", g.Instance)
 		return err
 	}
 	g.log.Infof("Done")
@@ -69,7 +69,7 @@ func (g *Google) checkCloudSQLInstanceStatus(ctx context.Context) (bool, error) 
 	}
 
 	for _, i := range instances {
-		if i.Name == g.instance {
+		if i.Name == g.Instance {
 			if g.hasPrivateIP(i.IpAddresses) {
 				return true, nil
 			} else {
@@ -78,7 +78,7 @@ func (g *Google) checkCloudSQLInstanceStatus(ctx context.Context) (bool, error) 
 		}
 	}
 
-	return false, fmt.Errorf("no cloudsql instance with name %v in project %v", g.instance, g.project)
+	return false, fmt.Errorf("no cloudsql instance with name %v in project %v", g.Instance, g.Project)
 }
 
 func (g *Google) hasPrivateIP(ipAddresses []map[string]string) bool {
@@ -123,7 +123,7 @@ func (g *Google) saExists(ctx context.Context) (bool, error) {
 	}
 
 	for _, sa := range sas {
-		if sa.Email == fmt.Sprintf("datastream@%v.iam.gserviceaccount.com", g.project) {
+		if sa.Email == fmt.Sprintf("datastream@%v.iam.gserviceaccount.com", g.Project) {
 			return true, nil
 		}
 	}
@@ -159,8 +159,8 @@ func (g *Google) grantSARoles(ctx context.Context) error {
 	err = g.performRequest(ctx, []string{
 		"projects",
 		"add-iam-policy-binding",
-		g.project,
-		fmt.Sprintf("--member=serviceAccount:datastream@%v.iam.gserviceaccount.com", g.project),
+		g.Project,
+		fmt.Sprintf("--member=serviceAccount:datastream@%v.iam.gserviceaccount.com", g.Project),
 		"--role=roles/cloudsql.client",
 		"--condition=None",
 	}, nil)
@@ -182,9 +182,9 @@ func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
 	err := g.performRequest(ctx, []string{
 		"projects",
 		"get-iam-policy",
-		g.project,
+		g.Project,
 		`--flatten="bindings[].members"`,
-		fmt.Sprintf(`--filter="bindings.members=serviceAccount:datastream@%v.iam.gserviceaccount.com"`, g.project),
+		fmt.Sprintf(`--filter="bindings.members=serviceAccount:datastream@%v.iam.gserviceaccount.com"`, g.Project),
 		"--format=json",
 	}, &iamPolicies)
 	if err != nil {
@@ -212,22 +212,40 @@ func (g *Google) createCloudSQLProxy(ctx context.Context) error {
 		return nil
 	}
 
-	err = g.performRequest(ctx, []string{
-		"compute",
-		"instances",
-		"create-with-container",
-		"datastream",
-		"--machine-type=f1-micro",
-		"--zone=europe-north1-b",
-		fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.project),
-		"--create-disk=image-project=debian-cloud,image-family=debian-11",
-		"--scopes=cloud-platform",
-		fmt.Sprintf("--network-interface=network=%v,subnet=%v,no-address", vpcName, vpcName),
-		"--container-image=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine",
-		fmt.Sprintf(`--container-arg=%v:%v:%v`, g.project, g.region, g.instance),
-		`--container-arg=--address=0.0.0.0`,
-		`--container-arg=--private-ip`,
-	}, nil)
+	if g.CloudSQLPrivateIP {
+		err = g.performRequest(ctx, []string{
+			"compute",
+			"instances",
+			"create-with-container",
+			"datastream",
+			"--machine-type=f1-micro",
+			"--zone=europe-north1-b",
+			fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
+			"--create-disk=image-project=debian-cloud,image-family=debian-11",
+			"--scopes=cloud-platform",
+			fmt.Sprintf("--network-interface=network=%v,subnet=%v,no-address", vpcName, vpcName),
+			"--container-image=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine",
+			fmt.Sprintf(`--container-arg=%v:%v:%v`, g.Project, g.Region, g.Instance),
+			`--container-arg=--address=0.0.0.0`,
+			`--container-arg=--private-ip`,
+		}, nil)
+	} else {
+		err = g.performRequest(ctx, []string{
+			"compute",
+			"instances",
+			"create-with-container",
+			"datastream",
+			"--machine-type=f1-micro",
+			"--zone=europe-north1-b",
+			fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
+			"--create-disk=image-project=debian-cloud,image-family=debian-11",
+			"--scopes=cloud-platform",
+			fmt.Sprintf("--network-interface=network=%v,subnet=%v", vpcName, vpcName),
+			"--container-image=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine",
+			fmt.Sprintf(`--container-arg=%v:%v:%v`, g.Project, g.Region, g.Instance),
+			`--container-arg=--address=0.0.0.0`,
+		}, nil)
+	}
 	if err != nil {
 		return err
 	}
@@ -280,7 +298,7 @@ func (g *Google) getProxyIP(ctx context.Context) (string, error) {
 	}
 
 	if len(instance.NetworkInterfaces) == 0 {
-		return "", fmt.Errorf("compute instance datastream does not exist in project %v", g.project)
+		return "", fmt.Errorf("compute instance datastream does not exist in project %v", g.Project)
 	}
 
 	for _, n := range instance.NetworkInterfaces {

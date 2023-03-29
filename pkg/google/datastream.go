@@ -36,6 +36,37 @@ func (g *Google) CreatePostgresProfile(ctx context.Context) error {
 	return nil
 }
 
+func (g *Google) CreateStream(ctx context.Context) error {
+	streamName := fmt.Sprintf("postgres-%v-bigquery", g.DB)
+	exists, err := g.streamExists(ctx, streamName)
+	if err != nil {
+		return err
+	}
+	if exists {
+		fmt.Println("already exists")
+		return nil
+	}
+
+	err = g.performRequest(ctx, []string{
+		"datastream",
+		"streams",
+		"create",
+		streamName,
+		fmt.Sprintf("--display-name=%v", streamName),
+		fmt.Sprintf("--location=%v", g.Region),
+		fmt.Sprintf("--source=projects/%v/locations/%v/connectionProfiles/postgres-datastream", g.Project, g.Region),
+		"--postgresql-source-config=pgconf.json",
+		fmt.Sprintf("--destination=projects/%v/locations/%v/connectionProfiles/bigquery-datastream", g.Project, g.Region),
+		"--bigquery-destination-config=bqconf.json",
+		"--backfill-none",
+	}, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (g *Google) createPrivateConnection(ctx context.Context) error {
 	exists, err := g.privateConnectionExists(ctx)
 	if err != nil {
@@ -53,7 +84,7 @@ func (g *Google) createPrivateConnection(ctx context.Context) error {
 		fmt.Sprintf("--display-name=%v", privateConnectionName),
 		fmt.Sprintf("--vpc=%v", vpcName),
 		fmt.Sprintf("--subnet=%v", datastreamSubnet),
-		fmt.Sprintf("--location=%v", g.region),
+		fmt.Sprintf("--location=%v", g.Region),
 	}, nil)
 	if err != nil {
 		return err
@@ -72,14 +103,14 @@ func (g *Google) privateConnectionExists(ctx context.Context) (bool, error) {
 		"datastream",
 		"private-connections",
 		"list",
-		fmt.Sprintf("--location=%v", g.region),
+		fmt.Sprintf("--location=%v", g.Region),
 	}, &privateCons)
 	if err != nil {
 		return false, err
 	}
 
 	for _, c := range privateCons {
-		if c.Name == fmt.Sprintf("projects/%v/locations/%v/privateConnections/%v", g.project, g.region, privateConnectionName) {
+		if c.Name == fmt.Sprintf("projects/%v/locations/%v/privateConnections/%v", g.Project, g.Region, privateConnectionName) {
 			return true, nil
 		}
 	}
@@ -125,8 +156,8 @@ func (g *Google) waitForPrivateConnectionUp(ctx context.Context) error {
 			"datastream",
 			"private-connections",
 			"list",
-			fmt.Sprintf("--location=%v", g.region),
-			fmt.Sprintf("--filter=name=projects/%v/locations/%v/privateConnections/%v", g.project, g.region, privateConnectionName),
+			fmt.Sprintf("--location=%v", g.Region),
+			fmt.Sprintf("--filter=name=projects/%v/locations/%v/privateConnections/%v", g.Project, g.Region, privateConnectionName),
 		}, &privCons)
 		if err != nil {
 			return err
@@ -185,7 +216,7 @@ func (g *Google) CreateDatastreamProfiles(ctx context.Context) error {
 }
 
 func (g *Google) createPostgresProfile(ctx context.Context) error {
-	profileName := fmt.Sprintf("postgres-%v", g.db)
+	profileName := fmt.Sprintf("postgres-%v", g.DB)
 	exists, err := g.profileExists(ctx, profileName)
 	if err != nil {
 		return err
@@ -204,15 +235,15 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		"connection-profiles",
 		"create",
 		profileName,
-		fmt.Sprintf("--display-name=postgres-%v", g.db),
+		fmt.Sprintf("--display-name=postgres-%v", g.DB),
 		"--type=postgresql",
-		fmt.Sprintf("--location=%v", g.region),
+		fmt.Sprintf("--location=%v", g.Region),
 		fmt.Sprintf("--private-connection=%v", privateConnectionName),
-		fmt.Sprintf("--postgresql-database=%v", g.db),
+		fmt.Sprintf("--postgresql-database=%v", g.DB),
 		fmt.Sprintf("--postgresql-hostname=%v", host),
-		fmt.Sprintf("--postgresql-username=%v", g.user),
-		fmt.Sprintf("--postgresql-password=%v", g.password),
-		fmt.Sprintf("--postgresql-port=%v", g.port),
+		fmt.Sprintf("--postgresql-username=%v", g.User),
+		fmt.Sprintf("--postgresql-password=%v", g.Password),
+		fmt.Sprintf("--postgresql-port=%v", g.Port),
 	}, nil)
 	if err != nil {
 		return err
@@ -222,7 +253,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 }
 
 func (g *Google) createBigqueryProfile(ctx context.Context) error {
-	profileName := fmt.Sprintf("bigquery-%v", g.db)
+	profileName := fmt.Sprintf("bigquery-%v", g.DB)
 	exists, err := g.profileExists(ctx, profileName)
 	if err != nil {
 		return err
@@ -236,9 +267,9 @@ func (g *Google) createBigqueryProfile(ctx context.Context) error {
 		"connection-profiles",
 		"create",
 		profileName,
-		fmt.Sprintf("--display-name=bigquery-%v", g.db),
+		fmt.Sprintf("--display-name=bigquery-%v", g.DB),
 		"--type=bigquery",
-		fmt.Sprintf("--location=%v", g.region),
+		fmt.Sprintf("--location=%v", g.Region),
 	}, nil)
 	if err != nil {
 		return err
@@ -257,14 +288,39 @@ func (g *Google) profileExists(ctx context.Context, profileName string) (bool, e
 		"datastream",
 		"connection-profiles",
 		"list",
-		fmt.Sprintf("--location=%v", g.region),
+		fmt.Sprintf("--location=%v", g.Region),
 	}, &profiles)
 	if err != nil {
 		return false, err
 	}
 
 	for _, p := range profiles {
-		if p.Name == fmt.Sprintf("projects/%v/locations/%v/connectionProfiles/%v", g.project, g.region, profileName) {
+		if p.Name == fmt.Sprintf("projects/%v/locations/%v/connectionProfiles/%v", g.Project, g.Region, profileName) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (g *Google) streamExists(ctx context.Context, streamName string) (bool, error) {
+	type datastream struct {
+		Name string `json:"name"`
+	}
+	datastreams := []*datastream{}
+
+	err := g.performRequest(ctx, []string{
+		"datastream",
+		"streams",
+		"list",
+		fmt.Sprintf("--location=%v", g.Region),
+	}, &datastreams)
+	if err != nil {
+		return false, err
+	}
+
+	for _, s := range datastreams {
+		if s.Name == fmt.Sprintf("projects/%v/locations/%v/streams/%v", g.Project, g.Region, streamName) {
 			return true, nil
 		}
 	}

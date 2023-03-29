@@ -55,7 +55,7 @@ func (g *Google) vpcExists(ctx context.Context) (bool, error) {
 		"list",
 	}, &vpcs)
 	if err != nil {
-		g.log.WithError(err).Errorf("listing VPCs in project %v", g.project)
+		g.log.WithError(err).Errorf("listing VPCs in project %v", g.Project)
 		return false, err
 	}
 
@@ -93,7 +93,7 @@ func (g *Google) enablePrivateGoogleAccessForVMSubnet(ctx context.Context) error
 		"subnets",
 		"update",
 		vpcName,
-		fmt.Sprintf("--region=%v", g.region),
+		fmt.Sprintf("--region=%v", g.Region),
 		"--enable-private-ip-google-access",
 	}, nil)
 	if err != nil {
@@ -125,7 +125,7 @@ func (g *Google) createAddressRange(ctx context.Context) error {
 		fmt.Sprintf("--network=%v", vpcName),
 	}, nil)
 	if err != nil {
-		g.log.WithError(err).Errorf("creating private address range for cloudsql instance", g.instance)
+		g.log.WithError(err).Errorf("creating private address range for cloudsql instance", g.Instance)
 		return err
 	}
 	g.log.Info("Done")
@@ -145,7 +145,7 @@ func (g *Google) addressRangeExists(ctx context.Context) (bool, error) {
 		"list",
 	}, &addressRanges)
 	if err != nil {
-		g.log.WithError(err).Errorf("listing addresses in project %v", g.project)
+		g.log.WithError(err).Errorf("listing addresses in project %v", g.Project)
 		return false, err
 	}
 
