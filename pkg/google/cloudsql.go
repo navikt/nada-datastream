@@ -35,7 +35,6 @@ func (g *Google) PatchCloudSQLInstance(ctx context.Context) error {
 		g.log.WithError(err).Errorf("patching sql instance %v", g.Instance)
 		return err
 	}
-	g.log.Infof("Done")
 
 	return nil
 }
@@ -100,6 +99,7 @@ func (g *Google) createSAIfNotExists(ctx context.Context) error {
 		return nil
 	}
 
+	g.log.Infof("Creating IAM service account for VM...")
 	if err := g.createSA(ctx); err != nil {
 		return err
 	}
@@ -153,9 +153,10 @@ func (g *Google) grantSARoles(ctx context.Context) error {
 		return err
 	}
 	if exists {
-		fmt.Println("exists")
 		return nil
 	}
+
+	g.log.Infof("Granting CloudSQL Client role to VM service account...")
 	err = g.performRequest(ctx, []string{
 		"projects",
 		"add-iam-policy-binding",
@@ -177,24 +178,20 @@ func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
 			Role string `json:"role"`
 		} `json:"bindings"`
 	}
-	iamPolicies := []*iamPolicy{}
+	iamPolicies := []*iamPolicy{} //[]map[string]any{}
 
 	err := g.performRequest(ctx, []string{
 		"projects",
 		"get-iam-policy",
 		g.Project,
-		`--flatten="bindings[].members"`,
-		fmt.Sprintf(`--filter="bindings.members=serviceAccount:datastream@%v.iam.gserviceaccount.com"`, g.Project),
-		"--format=json",
+		"--flatten=bindings[].members",
+		fmt.Sprintf("--filter=bindings.members=serviceAccount:datastream@%v.iam.gserviceaccount.com", g.Project),
 	}, &iamPolicies)
 	if err != nil {
 		return false, err
 	}
 
-	fmt.Println(iamPolicies)
-
 	for _, b := range iamPolicies {
-		fmt.Println(b.Bindings)
 		if b.Bindings.Role == "roles/cloudsql.client" {
 			return true, nil
 		}
@@ -212,6 +209,7 @@ func (g *Google) createCloudSQLProxy(ctx context.Context) error {
 		return nil
 	}
 
+	g.log.Infof("Creating CloudSQL proxy VM...")
 	if g.CloudSQLPrivateIP {
 		err = g.performRequest(ctx, []string{
 			"compute",

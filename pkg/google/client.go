@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	gcloudTimeout = 25 * time.Minute
+	gcloudTimeout = 45 * time.Minute
 )
 
 type Config struct {
@@ -26,6 +26,9 @@ type Config struct {
 	Port              string
 	Project           string
 	CloudSQLPrivateIP bool
+	ExcludeTables     string
+	ReplicationSlot   string
+	Publication       string
 }
 
 type Google struct {

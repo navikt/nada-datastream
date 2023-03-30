@@ -80,7 +80,6 @@ func (g *Google) createVPC(ctx context.Context) error {
 		g.log.WithError(err).Errorf("creating vpc %v", vpcName)
 		return err
 	}
-	g.log.Info("Done")
 
 	return nil
 }
@@ -99,7 +98,6 @@ func (g *Google) enablePrivateGoogleAccessForVMSubnet(ctx context.Context) error
 	if err != nil {
 		return err
 	}
-	g.log.Info("Done")
 
 	return nil
 }
@@ -128,7 +126,6 @@ func (g *Google) createAddressRange(ctx context.Context) error {
 		g.log.WithError(err).Errorf("creating private address range for cloudsql instance", g.Instance)
 		return err
 	}
-	g.log.Info("Done")
 
 	return nil
 }
@@ -181,7 +178,6 @@ func (g *Google) createPeering(ctx context.Context) error {
 		g.log.WithError(err).Errorf("creating peering between VPC %v and cloudsql private range %v", vpcName, addressRangeName)
 		return err
 	}
-	g.log.Info("Done")
 
 	return nil
 }

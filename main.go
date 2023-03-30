@@ -24,6 +24,9 @@ func main() {
 	flag.StringVar(&cfg.User, "user", "", "Database user")
 	flag.StringVar(&cfg.Password, "password", "", "Database password")
 
+	flag.StringVar(&cfg.ExcludeTables, "exclude-tables", "", "Comma separated list of postgres tables that should be omitted from the datastream")
+	flag.StringVar(&cfg.ReplicationSlot, "replication-slot", "ds_replication", "Name of the replication slot created in the database")
+	flag.StringVar(&cfg.Publication, "publication", "ds_publication", "Name of the publication created in the database")
 	flag.StringVar(&cfg.Region, "region", cfg.Region, "GCP region")
 	flag.StringVar(&cfg.Port, "port", cfg.Port, "Database port")
 	flag.BoolVar(&cfg.CloudSQLPrivateIP, "cloudsql-private-ip", cfg.CloudSQLPrivateIP, "Setup and use cloudsql private ip")
@@ -61,7 +64,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// if err := googleClient.CreateStream(ctx); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := googleClient.CreateStream(ctx); err != nil {
+		log.Fatal(err)
+	}
 }

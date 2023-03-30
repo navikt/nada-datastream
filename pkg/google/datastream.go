@@ -43,7 +43,7 @@ func (g *Google) CreateStream(ctx context.Context) error {
 		return err
 	}
 	if exists {
-		fmt.Println("already exists")
+		fmt.Println("debug: datastream exists")
 		return nil
 	}
 
@@ -76,6 +76,7 @@ func (g *Google) createPrivateConnection(ctx context.Context) error {
 		return nil
 	}
 
+	g.log.Infof("Creating Datastream private connection...")
 	err = g.performRequest(ctx, []string{
 		"datastream",
 		"private-connections",
@@ -230,6 +231,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		return err
 	}
 
+	g.log.Infof("Creating Datastream postgres profile...")
 	err = g.performRequest(ctx, []string{
 		"datastream",
 		"connection-profiles",
@@ -249,6 +251,15 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		return err
 	}
 
+	// creation of datastream profiles fails silently, so we must check whether the resource was created
+	exists, err = g.profileExists(ctx, profileName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("unable to create datastream profile %v", profileName)
+	}
+
 	return nil
 }
 
@@ -262,6 +273,7 @@ func (g *Google) createBigqueryProfile(ctx context.Context) error {
 		return nil
 	}
 
+	g.log.Infof("Creating Datastream Bigquery profile...")
 	err = g.performRequest(ctx, []string{
 		"datastream",
 		"connection-profiles",
@@ -273,6 +285,15 @@ func (g *Google) createBigqueryProfile(ctx context.Context) error {
 	}, nil)
 	if err != nil {
 		return err
+	}
+
+	// creation of datastream profiles fails silently, so we must check whether the resource was created
+	exists, err = g.profileExists(ctx, profileName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return fmt.Errorf("unable to create datastream profile %v", profileName)
 	}
 
 	return nil
