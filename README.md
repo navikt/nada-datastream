@@ -46,3 +46,5 @@ For å sette opp datastream kjør så følgende:
 ````bash
 ./bin/nada-datastream --project=<gcp prosjekt> --instance=<instans navn> --db=<db navn> --user=<bruker> --password=<passord>
 ````
+
+NB! krever gcloud versjon høyere enn 412.0.0, oppdater med `gcloud components update`
