@@ -4,6 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"gopkg.in/yaml.v2"
+)
+
+const (
+	proxyVMName            = "datastream"
+	cloudsqlContainerImage = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine"
 )
 
 type sqlInstance struct {
@@ -48,7 +55,7 @@ func (g *Google) CreateCloudSQLProxy(ctx context.Context) error {
 		return err
 	}
 
-	if err := g.createCloudSQLProxy(ctx); err != nil {
+	if err := g.createOrUpdateCloudSQLProxy(ctx); err != nil {
 		return err
 	}
 
@@ -200,12 +207,15 @@ func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) createCloudSQLProxy(ctx context.Context) error {
+func (g *Google) createOrUpdateCloudSQLProxy(ctx context.Context) error {
 	exists, err := g.cloudSQLProxyExists(ctx)
 	if err != nil {
 		return err
 	}
 	if exists {
+		if err := g.updateCloudSQLProxy(ctx); err != nil {
+			return err
+		}
 		return nil
 	}
 
@@ -215,14 +225,14 @@ func (g *Google) createCloudSQLProxy(ctx context.Context) error {
 			"compute",
 			"instances",
 			"create-with-container",
-			"datastream",
+			proxyVMName,
 			"--machine-type=f1-micro",
 			"--zone=europe-north1-b",
 			fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
 			"--create-disk=image-project=debian-cloud,image-family=debian-11",
 			"--scopes=cloud-platform",
 			fmt.Sprintf("--network-interface=network=%v,subnet=%v,no-address", vpcName, vpcName),
-			"--container-image=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine",
+			fmt.Sprintf("--container-image=%v", cloudsqlContainerImage),
 			fmt.Sprintf(`--container-arg=%v:%v:%v`, g.Project, g.Region, g.Instance),
 			`--container-arg=--address=0.0.0.0`,
 			`--container-arg=--private-ip`,
@@ -232,14 +242,14 @@ func (g *Google) createCloudSQLProxy(ctx context.Context) error {
 			"compute",
 			"instances",
 			"create-with-container",
-			"datastream",
+			proxyVMName,
 			"--machine-type=f1-micro",
 			"--zone=europe-north1-b",
 			fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
 			"--create-disk=image-project=debian-cloud,image-family=debian-11",
 			"--scopes=cloud-platform",
 			fmt.Sprintf("--network-interface=network=%v,subnet=%v", vpcName, vpcName),
-			"--container-image=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine",
+			fmt.Sprintf("--container-image=%v", cloudsqlContainerImage),
 			fmt.Sprintf(`--container-arg=%v:%v:%v`, g.Project, g.Region, g.Instance),
 			`--container-arg=--address=0.0.0.0`,
 		}, nil)
@@ -307,4 +317,91 @@ func (g *Google) getProxyIP(ctx context.Context) (string, error) {
 	}
 
 	return "", fmt.Errorf("compute instance datastream does not have expected network interface %v", vpcName)
+}
+
+func (g *Google) updateCloudSQLProxy(ctx context.Context) error {
+	updatedSQLInstanceList, err := g.proxyVMNeedsUpdate(ctx)
+	if err != nil {
+		return err
+	}
+	if updatedSQLInstanceList == "" {
+		return nil
+	}
+
+	g.log.Infof("Updating CloudSQL proxy VM...")
+	if g.CloudSQLPrivateIP {
+		err = g.performRequest(ctx, []string{
+			"compute",
+			"instances",
+			"update-container",
+			proxyVMName,
+			fmt.Sprintf("--container-arg=%v", updatedSQLInstanceList),
+			`--container-arg=--address=0.0.0.0`,
+		}, nil)
+	} else {
+		err = g.performRequest(ctx, []string{
+			"compute",
+			"instances",
+			"update-container",
+			proxyVMName,
+			fmt.Sprintf("--container-arg=%v", updatedSQLInstanceList),
+			`--container-arg=--address=0.0.0.0`,
+			`--container-arg=--private-ip`,
+		}, nil)
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g *Google) proxyVMNeedsUpdate(ctx context.Context) (string, error) {
+	type containerSpec struct {
+		Spec struct {
+			Containers []struct {
+				Args []string `json:"args"`
+			} `json:"containers"`
+		} `json:"spec"`
+	}
+
+	type proxyVMInfo struct {
+		Metadata struct {
+			Items []map[string]string `json:"items"`
+		} `json:"metadata"`
+	}
+	proxyVM := &proxyVMInfo{}
+
+	err := g.performRequest(ctx, []string{
+		"compute",
+		"instances",
+		"describe",
+		proxyVMName,
+		"--zone=europe-north1-b",
+	}, &proxyVM)
+	if err != nil {
+		return "", err
+	}
+
+	for _, i := range proxyVM.Metadata.Items {
+		if i["key"] == "gce-container-declaration" {
+			spec := containerSpec{}
+			if err := yaml.Unmarshal([]byte(i["value"]), &spec); err != nil {
+				return "", err
+			}
+			if len(spec.Spec.Containers) != 1 {
+				return "", fmt.Errorf("cloudsql proxy container declaration should contain one (and only one) container, got %v", len(spec.Spec.Containers))
+			}
+
+			for _, a := range spec.Spec.Containers[0].Args {
+				if strings.Contains(a, g.Project+":") {
+					if !strings.Contains(a, fmt.Sprintf("%v:%v:%v", g.Project, g.Region, g.Instance)) {
+						return a + fmt.Sprintf(",%v:%v:%v", g.Project, g.Region, g.Instance), nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", nil
 }

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/navikt/nada-datastream/cmd"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,36 +18,21 @@ const (
 	gcloudTimeout = 45 * time.Minute
 )
 
-type Config struct {
-	Instance          string
-	Region            string
-	DB                string
-	User              string
-	Password          string
-	Port              string
-	Project           string
-	CloudSQLPrivateIP bool
-	ExcludeTables     string
-	ReplicationSlot   string
-	Publication       string
-}
-
 type Google struct {
-	Config
-
 	log *logrus.Entry
+	cmd.Config
 }
 
-func New(log *logrus.Entry, cfg Config) *Google {
+func New(log *logrus.Entry, cfg cmd.Config) *Google {
 	return &Google{
 		log:    log,
 		Config: cfg,
 	}
 }
 
-func (g *Google) performRequest(ctx context.Context, args []string, out any) error {
+func (g *Google) performRequest(ctx context.Context, args []string, out interface{}) error {
 	if out == nil {
-		out = []map[string]any{}
+		out = []map[string]interface{}{}
 	}
 
 	args = append(args, fmt.Sprintf("--project=%v", g.Project))
