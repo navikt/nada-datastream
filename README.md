@@ -44,7 +44,12 @@ Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Edi
 For å sette opp datastream kjør så følgende:
 
 ````bash
-./bin/nada-datastream appnavn databasebruker
+./bin/nada-datastream create appnavn databasebruker
 ````
+
+For flagg se
+```bash
+./bin/nada-datastream create --help
+```
 
 NB! krever gcloud versjon høyere enn 412.0.0, oppdater med `gcloud components update`
