@@ -18,7 +18,7 @@ var create = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		log := logrus.New()
-		cfg := dsCmd.Config{
+		cfg := &dsCmd.Config{
 			Publication:     "ds_publication",
 			ReplicationSlot: "ds_replication",
 		}

@@ -20,10 +20,10 @@ const (
 
 type Google struct {
 	log *logrus.Entry
-	cmd.Config
+	*cmd.Config
 }
 
-func New(log *logrus.Entry, cfg cmd.Config) *Google {
+func New(log *logrus.Entry, cfg *cmd.Config) *Google {
 	return &Google{
 		log:    log,
 		Config: cfg,

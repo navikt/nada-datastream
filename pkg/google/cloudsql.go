@@ -2,9 +2,13 @@ package google
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/navikt/nada-datastream/cmd"
 	"gopkg.in/yaml.v2"
 )
 
@@ -46,7 +50,7 @@ func (g *Google) PatchCloudSQLInstance(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) CreateCloudSQLProxy(ctx context.Context) error {
+func (g *Google) CreateOrUpdateCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
 	if err := g.createSAIfNotExists(ctx); err != nil {
 		return err
 	}
@@ -55,7 +59,7 @@ func (g *Google) CreateCloudSQLProxy(ctx context.Context) error {
 		return err
 	}
 
-	if err := g.createOrUpdateCloudSQLProxy(ctx); err != nil {
+	if err := g.createOrUpdateCloudSQLProxy(ctx, cfg); err != nil {
 		return err
 	}
 
@@ -207,13 +211,13 @@ func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) createOrUpdateCloudSQLProxy(ctx context.Context) error {
+func (g *Google) createOrUpdateCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
 	exists, err := g.cloudSQLProxyExists(ctx)
 	if err != nil {
 		return err
 	}
 	if exists {
-		if err := g.updateCloudSQLProxy(ctx); err != nil {
+		if err := g.updateCloudSQLProxy(ctx, cfg); err != nil {
 			return err
 		}
 		return nil
@@ -233,7 +237,7 @@ func (g *Google) createOrUpdateCloudSQLProxy(ctx context.Context) error {
 			"--scopes=cloud-platform",
 			fmt.Sprintf("--network-interface=network=%v,subnet=%v,no-address", vpcName, vpcName),
 			fmt.Sprintf("--container-image=%v", cloudsqlContainerImage),
-			fmt.Sprintf(`--container-arg=%v:%v:%v`, g.Project, g.Region, g.Instance),
+			fmt.Sprintf(`--container-arg=%v:%v:%v?port=5432`, g.Project, g.Region, g.Instance),
 			`--container-arg=--address=0.0.0.0`,
 			`--container-arg=--private-ip`,
 		}, nil)
@@ -250,7 +254,7 @@ func (g *Google) createOrUpdateCloudSQLProxy(ctx context.Context) error {
 			"--scopes=cloud-platform",
 			fmt.Sprintf("--network-interface=network=%v,subnet=%v", vpcName, vpcName),
 			fmt.Sprintf("--container-image=%v", cloudsqlContainerImage),
-			fmt.Sprintf(`--container-arg=%v:%v:%v`, g.Project, g.Region, g.Instance),
+			fmt.Sprintf(`--container-arg=%v:%v:%v?port=5432`, g.Project, g.Region, g.Instance),
 			`--container-arg=--address=0.0.0.0`,
 		}, nil)
 	}
@@ -285,12 +289,15 @@ func (g *Google) cloudSQLProxyExists(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) getProxyIP(ctx context.Context) (string, error) {
+func (g *Google) getProxyIPAndPort(ctx context.Context) (string, string, error) {
 	type DBInstance struct {
 		NetworkInterfaces []struct {
 			Network   string `json:"network"`
 			NetworkIP string `json:"networkIP"`
 		} `json:"networkInterfaces"`
+		Metadata struct {
+			Items []map[string]string `json:"items"`
+		} `json:"metadata"`
 	}
 	instance := DBInstance{}
 
@@ -302,61 +309,73 @@ func (g *Google) getProxyIP(ctx context.Context) (string, error) {
 		"--zone=europe-north1-b",
 	}, &instance)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if len(instance.NetworkInterfaces) == 0 {
-		return "", fmt.Errorf("compute instance datastream does not exist in project %v", g.Project)
+		return "", "", fmt.Errorf("compute instance datastream does not exist in project %v", g.Project)
+	}
+
+	port, err := g.findPort(instance.Metadata.Items)
+	if err != nil {
+		return "", "", err
 	}
 
 	for _, n := range instance.NetworkInterfaces {
 		nParts := strings.Split(n.Network, "/")
 		if nParts[len(nParts)-1] == vpcName {
-			return n.NetworkIP, nil
+			return n.NetworkIP, port, nil
 		}
 	}
 
-	return "", fmt.Errorf("compute instance datastream does not have expected network interface %v", vpcName)
+	return "", "", fmt.Errorf("compute instance datastream does not have expected network interface %v", vpcName)
 }
 
-func (g *Google) updateCloudSQLProxy(ctx context.Context) error {
-	updatedSQLInstanceList, err := g.proxyVMNeedsUpdate(ctx)
+func (g *Google) updateCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
+	updatedSQLInstanceList, err := g.proxyVMNeedsUpdate(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	if updatedSQLInstanceList == "" {
+	if updatedSQLInstanceList == nil {
 		return nil
 	}
+	instanceArgs := createInstanceContainerArgs(updatedSQLInstanceList)
 
 	g.log.Infof("Updating CloudSQL proxy VM...")
 	if g.CloudSQLPrivateIP {
-		err = g.performRequest(ctx, []string{
+		cmd := []string{
 			"compute",
 			"instances",
 			"update-container",
 			proxyVMName,
-			fmt.Sprintf("--container-arg=%v", updatedSQLInstanceList),
-			`--container-arg=--address=0.0.0.0`,
-		}, nil)
-	} else {
-		err = g.performRequest(ctx, []string{
-			"compute",
-			"instances",
-			"update-container",
-			proxyVMName,
-			fmt.Sprintf("--container-arg=%v", updatedSQLInstanceList),
+			"--zone=europe-north1-b",
 			`--container-arg=--address=0.0.0.0`,
 			`--container-arg=--private-ip`,
-		}, nil)
+		}
+		err = g.performRequest(ctx, append(cmd, instanceArgs...), nil)
+	} else {
+		cmd := []string{
+			"compute",
+			"instances",
+			"update-container",
+			proxyVMName,
+			`--container-arg=--address=0.0.0.0`,
+			"--zone=europe-north1-b",
+		}
+		err = g.performRequest(ctx, append(cmd, instanceArgs...), nil)
 	}
 	if err != nil {
+		return err
+	}
+
+	if err := g.updateDatastreamFirewallRule(ctx, cfg); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (g *Google) proxyVMNeedsUpdate(ctx context.Context) (string, error) {
+func (g *Google) proxyVMNeedsUpdate(ctx context.Context, cfg *cmd.Config) ([]string, error) {
 	type containerSpec struct {
 		Spec struct {
 			Containers []struct {
@@ -380,10 +399,86 @@ func (g *Google) proxyVMNeedsUpdate(ctx context.Context) (string, error) {
 		"--zone=europe-north1-b",
 	}, &proxyVM)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for _, i := range proxyVM.Metadata.Items {
+		if i["key"] == "gce-container-declaration" {
+			spec := containerSpec{}
+			if err := yaml.Unmarshal([]byte(i["value"]), &spec); err != nil {
+				return nil, err
+			}
+			if len(spec.Spec.Containers) != 1 {
+				return nil, fmt.Errorf("cloudsql proxy container declaration should contain one (and only one) container, got %v", len(spec.Spec.Containers))
+			}
+
+			instances := []string{}
+			for _, a := range spec.Spec.Containers[0].Args {
+				if strings.Contains(a, g.Project+":") {
+					instances = append(instances, a)
+				}
+			}
+
+			if !containsInstance(instances, fmt.Sprintf("%v:%v:%v", g.Project, g.Region, g.Instance)) {
+				port, err := g.nextPort(instances)
+				if err != nil {
+					return nil, err
+				}
+				return append(instances, fmt.Sprintf("%v:%v:%v?port=%v", g.Project, g.Region, g.Instance, port)), nil
+			}
+		}
+	}
+
+	return nil, nil
+}
+
+func (g *Google) nextPort(instances []string) (int, error) {
+	lastPort := 5432
+	for _, i := range instances {
+		r, _ := regexp.Compile(`port=(\d*)`)
+		port, err := strconv.Atoi(strings.TrimPrefix(r.FindString(i), "port="))
+		if err != nil {
+			return 0, err
+		}
+		if port > lastPort {
+			lastPort = port
+		}
+	}
+
+	return lastPort + 1, nil
+}
+
+func containsInstance(instances []string, instance string) bool {
+	for _, i := range instances {
+		if strings.Contains(i, instance) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func createInstanceContainerArgs(instances []string) []string {
+	out := []string{}
+
+	for _, i := range instances {
+		out = append(out, "--container-arg="+i)
+	}
+
+	return out
+}
+
+func (g *Google) findPort(items []map[string]string) (string, error) {
+	type containerSpec struct {
+		Spec struct {
+			Containers []struct {
+				Args []string `json:"args"`
+			} `json:"containers"`
+		} `json:"spec"`
+	}
+
+	instance := fmt.Sprintf(`%v:%v:%v`, g.Project, g.Region, g.Instance)
+	for _, i := range items {
 		if i["key"] == "gce-container-declaration" {
 			spec := containerSpec{}
 			if err := yaml.Unmarshal([]byte(i["value"]), &spec); err != nil {
@@ -394,14 +489,13 @@ func (g *Google) proxyVMNeedsUpdate(ctx context.Context) (string, error) {
 			}
 
 			for _, a := range spec.Spec.Containers[0].Args {
-				if strings.Contains(a, g.Project+":") {
-					if !strings.Contains(a, fmt.Sprintf("%v:%v:%v", g.Project, g.Region, g.Instance)) {
-						return a + fmt.Sprintf(",%v:%v:%v", g.Project, g.Region, g.Instance), nil
-					}
+				if strings.HasPrefix(a, instance) {
+					return strings.TrimPrefix(a, instance+"?port="), nil
 				}
 			}
+
 		}
 	}
 
-	return "", nil
+	return "", errors.New("no container spec")
 }

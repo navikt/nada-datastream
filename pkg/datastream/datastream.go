@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string, log *logrus.Logger) (cmd.DBConfig, error) {
+func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string, log *logrus.Logger) (*cmd.DBConfig, error) {
 	k8sClient, err := k8s.New()
 	if err != nil {
 		log.Fatal(err)
@@ -17,13 +17,13 @@ func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string
 
 	cfg, err := k8sClient.DBConfig(ctx, appName, dbUser)
 	if err != nil {
-		return cmd.DBConfig{}, err
+		return nil, err
 	}
 
-	return cfg, nil
+	return &cfg, nil
 }
 
-func Create(ctx context.Context, cfg cmd.Config, log *logrus.Logger) error {
+func Create(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
 	googleClient := google.New(log.WithField("subsystem", "google"), cfg)
 
 	if err := googleClient.EnableAPIs(ctx); err != nil {
@@ -44,7 +44,7 @@ func Create(ctx context.Context, cfg cmd.Config, log *logrus.Logger) error {
 		}
 	}
 
-	if err := googleClient.CreateCloudSQLProxy(ctx); err != nil {
+	if err := googleClient.CreateOrUpdateCloudSQLProxy(ctx, cfg); err != nil {
 		return err
 	}
 

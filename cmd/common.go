@@ -11,7 +11,7 @@ type DBConfig struct {
 }
 
 type Config struct {
-	DBConfig
+	*DBConfig
 
 	CloudSQLPrivateIP bool
 	ExcludeTables     []string

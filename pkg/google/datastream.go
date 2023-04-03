@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"github.com/navikt/nada-datastream/cmd"
 )
 
 const (
@@ -22,14 +24,6 @@ func (g *Google) CreateDatastreamPrivateConnection(ctx context.Context) error {
 	}
 
 	if err := g.waitForPrivateConnectionUp(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) CreatePostgresProfile(ctx context.Context) error {
-	if err := g.createPostgresProfile(ctx); err != nil {
 		return err
 	}
 
@@ -145,6 +139,26 @@ func (g *Google) createDatastreamFirewallRule(ctx context.Context) error {
 	return nil
 }
 
+func (g *Google) updateDatastreamFirewallRule(ctx context.Context, cfg *cmd.Config) error {
+	_, err := g.datastreamFirewallRuleExists(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = g.performRequest(ctx, []string{
+		"compute",
+		"firewall-rules",
+		"update",
+		firewallRuleName,
+		fmt.Sprintf("--allow=tcp:%v", "5432-"+cfg.Port),
+	}, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (g *Google) waitForPrivateConnectionUp(ctx context.Context) error {
 	type privateConnection struct {
 		Name  string `json:"name"`
@@ -226,7 +240,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		return nil
 	}
 
-	host, err := g.getProxyIP(ctx)
+	host, port, err := g.getProxyIPAndPort(ctx)
 	if err != nil {
 		return err
 	}
@@ -245,7 +259,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		fmt.Sprintf("--postgresql-hostname=%v", host),
 		fmt.Sprintf("--postgresql-username=%v", g.User),
 		fmt.Sprintf("--postgresql-password=%v", g.Password),
-		fmt.Sprintf("--postgresql-port=%v", g.Port),
+		fmt.Sprintf("--postgresql-port=%v", port),
 	}, nil)
 	if err != nil {
 		return err
