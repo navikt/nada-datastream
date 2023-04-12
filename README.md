@@ -41,6 +41,11 @@ Merk: både appens bruker og den nye brukeren trenger å oppdateres med `REPLICA
 ## Sett opp datastream kobling
 Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Editor` rolle i prosjektet.
 
+Oppsettet krever at man:
+    - er koblet til naisdevice
+    - har tilgang til clusteret og namespacet som appen kjører i
+    - har kjørt `gcloud auth login --update-adc`
+
 For å sette opp datastream kjør så følgende:
 
 ````bash
