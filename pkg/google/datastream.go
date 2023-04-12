@@ -2,10 +2,16 @@ package google
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"time"
 
+	"cloud.google.com/go/bigquery"
 	"github.com/navikt/nada-datastream/cmd"
+	"google.golang.org/api/iterator"
 )
 
 const (
@@ -37,9 +43,20 @@ func (g *Google) CreateStream(ctx context.Context) error {
 		return err
 	}
 	if exists {
-		fmt.Println("debug: datastream exists")
 		return nil
 	}
+
+	pgConfig, err := g.createPostgresStreamConfig(ctx)
+	if err != nil {
+		return err
+	}
+	defer deleteTempFile(pgConfig)
+
+	bqConfig, err := g.createBigQueryStreamConfig(ctx)
+	if err != nil {
+		return err
+	}
+	defer deleteTempFile(pgConfig)
 
 	err = g.performRequest(ctx, []string{
 		"datastream",
@@ -48,11 +65,11 @@ func (g *Google) CreateStream(ctx context.Context) error {
 		streamName,
 		fmt.Sprintf("--display-name=%v", streamName),
 		fmt.Sprintf("--location=%v", g.Region),
-		fmt.Sprintf("--source=projects/%v/locations/%v/connectionProfiles/postgres-datastream", g.Project, g.Region),
-		"--postgresql-source-config=pgconf.json",
-		fmt.Sprintf("--destination=projects/%v/locations/%v/connectionProfiles/bigquery-datastream", g.Project, g.Region),
-		"--bigquery-destination-config=bqconf.json",
-		"--backfill-none",
+		fmt.Sprintf("--source=projects/%v/locations/%v/connectionProfiles/postgres-%v", g.Project, g.Region, g.DB),
+		fmt.Sprintf("--postgresql-source-config=%v", pgConfig),
+		fmt.Sprintf("--destination=projects/%v/locations/%v/connectionProfiles/bigquery-%v", g.Project, g.Region, g.DB),
+		fmt.Sprintf("--bigquery-destination-config=%v", bqConfig),
+		"--backfill-all",
 	}, nil)
 	if err != nil {
 		return err
@@ -361,4 +378,122 @@ func (g *Google) streamExists(ctx context.Context, streamName string) (bool, err
 	}
 
 	return false, nil
+}
+
+func (g *Google) createPostgresStreamConfig(ctx context.Context) (string, error) {
+	cfg := map[string]any{}
+	cfg["replicationSlot"] = g.ReplicationSlot
+	cfg["publication"] = g.Publication
+
+	if len(g.ExcludeTables) > 0 {
+		tables := []map[string]string{}
+		for _, t := range g.ExcludeTables {
+			tables = append(tables, map[string]string{"table": t})
+		}
+		cfg["excludeObjects"] = map[string]any{
+			"postgresqlSchemas": []map[string]any{
+				{
+					"schema":           "public",
+					"postgresqlTables": tables,
+				},
+			},
+		}
+	}
+
+	file, err := ioutil.TempFile("", "ds-pg-config")
+	if err != nil {
+		return "", err
+	}
+
+	cfgBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	_, err = file.Write(cfgBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
+func (g *Google) createBigQueryStreamConfig(ctx context.Context) (string, error) {
+	datasetID := "datastream_" + g.DB
+	exists, err := g.datasetExists(ctx, datasetID)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		if err := g.createDataset(ctx, datasetID); err != nil {
+			return "", err
+		}
+	}
+
+	cfg := map[string]any{
+		"singleTargetDataset": map[string]string{
+			"datasetId": fmt.Sprintf("%v:%v", g.Project, datasetID),
+		},
+		"dataFreshness": "900s",
+	}
+
+	file, err := ioutil.TempFile("", "ds-bq-config")
+	if err != nil {
+		return "", err
+	}
+
+	cfgBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	_, err = file.Write(cfgBytes)
+	if err != nil {
+		return "", err
+	}
+
+	return file.Name(), nil
+}
+
+func (g *Google) datasetExists(ctx context.Context, datasetID string) (bool, error) {
+	client, err := bigquery.NewClient(ctx, g.Project)
+	if err != nil {
+		return false, err
+	}
+	defer client.Close()
+
+	datasets := client.Datasets(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	for {
+		ds, err := datasets.Next()
+		if err != nil {
+			if errors.Is(err, iterator.Done) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		if ds.DatasetID == datasetID {
+			return true, nil
+		}
+	}
+}
+
+func (g *Google) createDataset(ctx context.Context, datasetID string) error {
+	client, err := bigquery.NewClient(ctx, g.Project)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	return client.Dataset(datasetID).Create(ctx, &bigquery.DatasetMetadata{
+		Location: g.Region,
+	})
+}
+
+func deleteTempFile(file string) {
+	if err := os.RemoveAll(file); err != nil {
+		panic(err)
+	}
 }

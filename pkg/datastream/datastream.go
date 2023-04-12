@@ -56,9 +56,9 @@ func Create(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
 		return err
 	}
 
-	// if err := googleClient.CreateStream(ctx); err != nil {
-	// 	return err
-	// }
+	if err := googleClient.CreateStream(ctx); err != nil {
+		return err
+	}
 
 	return nil
 }
