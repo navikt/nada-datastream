@@ -47,6 +47,12 @@ For å sette opp datastream kjør så følgende:
 ./bin/nada-datastream create appnavn databasebruker
 ````
 
+Dersom man ikke spesifiserer noe vil alle tabeller i public schema i databasen inkluderes i streamen. For å ekskludere enkelte tabeller bruk flagget `--exclude-tables` som tar en kommaseparert streng med tabellene man ønsker å utelate, f.eks.
+
+````bash
+./bin/nada-datastream create appnavn databasebruker --exclude-tables=tabell1,tabell2,tabell3
+````
+
 For flagg se
 ```bash
 ./bin/nada-datastream create --help
