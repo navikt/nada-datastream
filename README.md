@@ -38,6 +38,7 @@ CREATE PUBLICATION "ds_publication" FOR ALL TABLES;
 SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('ds_replication', 'pgoutput');
 ````
 Merk: både appens bruker ("appnavn") og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
+NB: Det er i dag kun støtte for å kjøre scriptet på Mac.
 
 ## Sett opp datastream kobling
 Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Editor` rolle i prosjektet.
