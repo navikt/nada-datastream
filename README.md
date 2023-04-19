@@ -24,7 +24,8 @@ spec:
 ... 
 ````
 
-Videre må man legge til en databasemigrasjon som sørger for at den nyopprettede brukeren får tilgang til å lese de tabellene den er avhengig av for datastreamen. I eksempelet under er det gitt `select` tilgang for alle tabeller i `public` schema, men dette kan man spisse ytterligere dersom det er ønskelig.
+Videre må man legge til en databasemigrasjon som sørger for at den nyopprettede brukeren får tilgang til å lese de tabellene den er avhengig av for datastreamen. 
+I eksempelet under er det gitt `select` tilgang for alle tabeller i `public` schema, men dette kan man spisse ytterligere dersom det er ønskelig.
 
 Migrasjonen må også gi den nyopprettede brukeren `REPLICATION` rolle i databasen og lage en [publication og replication slot](https://cloud.google.com/datastream/docs/configure-your-source-postgresql-database#create_a_publication_and_a_replication_slot_2).
 ````sql
@@ -36,15 +37,19 @@ ALTER USER "datastream" WITH REPLICATION;
 CREATE PUBLICATION "ds_publication" FOR ALL TABLES;
 SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('ds_replication', 'pgoutput');
 ````
-Merk: både appens bruker og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
+Merk: både appens bruker ("appnavn") og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
 
 ## Sett opp datastream kobling
 Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Editor` rolle i prosjektet.
+Dette gjøres i IAM under `Grant Access`: `Role` -> `Basic`-> `Editor`.
 
 Oppsettet krever at man:
     - er koblet til naisdevice
     - har tilgang til clusteret og namespacet som appen kjører i
     - har kjørt `gcloud auth login --update-adc`
+
+Det enkleste er at context (cluster og namespace) allerede er satt i terminalen. 
+Det er også mulig å spesifisere dette som script-argumenter: `--context` og `--namespace`
 
 For å sette opp datastream kjør så følgende:
 
