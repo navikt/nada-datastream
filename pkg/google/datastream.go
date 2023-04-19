@@ -75,6 +75,7 @@ func (g *Google) CreateStream(ctx context.Context) error {
 		return err
 	}
 
+	g.log.Info("Gå til https://console.cloud.google.com/datastream/streams?referrer=search&project=%v for å aktivere streamen %v", g.Project, streamName)
 	return nil
 }
 
