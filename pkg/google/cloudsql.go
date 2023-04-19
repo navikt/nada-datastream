@@ -230,7 +230,7 @@ func (g *Google) createOrUpdateCloudSQLProxy(ctx context.Context, cfg *cmd.Confi
 			"instances",
 			"create-with-container",
 			proxyVMName,
-			"--machine-type=f1-micro",
+			"--machine-type=n1-standard-2",
 			"--zone=europe-north1-b",
 			fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
 			"--create-disk=image-project=debian-cloud,image-family=debian-11",

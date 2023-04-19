@@ -70,12 +70,13 @@ func (g *Google) CreateStream(ctx context.Context) error {
 		fmt.Sprintf("--destination=projects/%v/locations/%v/connectionProfiles/bigquery-%v", g.Project, g.Region, g.DB),
 		fmt.Sprintf("--bigquery-destination-config=%v", bqConfig),
 		"--backfill-all",
+		"--labels=created-by=nada",
 	}, nil)
 	if err != nil {
 		return err
 	}
 
-	g.log.Info("Gå til https://console.cloud.google.com/datastream/streams?referrer=search&project=%v for å aktivere streamen %v", g.Project, streamName)
+	g.log.Infof("Gå til https://console.cloud.google.com/datastream/streams?referrer=search&project=%v for å aktivere streamen %v", g.Project, streamName)
 	return nil
 }
 
