@@ -34,17 +34,7 @@ func Create(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
 		return err
 	}
 
-	if cfg.CloudSQLPrivateIP {
-		if err := googleClient.PreparePrivateServiceConnectivity(ctx); err != nil {
-			return err
-		}
-
-		if err := googleClient.PatchCloudSQLInstance(ctx); err != nil {
-			return err
-		}
-	}
-
-	if err := googleClient.CreateOrUpdateCloudSQLProxy(ctx, cfg); err != nil {
+	if err := googleClient.CreateCloudSQLProxy(ctx, cfg); err != nil {
 		return err
 	}
 

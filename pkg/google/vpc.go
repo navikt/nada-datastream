@@ -31,18 +31,6 @@ func (g *Google) CreateVPC(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) PreparePrivateServiceConnectivity(ctx context.Context) error {
-	if err := g.createAddressRange(ctx); err != nil {
-		return err
-	}
-
-	if err := g.createPeering(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (g *Google) vpcExists(ctx context.Context) (bool, error) {
 	type vpc struct {
 		Name string `json:"name"`

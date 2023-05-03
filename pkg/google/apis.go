@@ -11,9 +11,7 @@ func (g *Google) EnableAPIs(ctx context.Context) error {
 		"bigquery.googleapis.com",
 		"compute.googleapis.com",
 		"datastream.googleapis.com",
-		"run.googleapis.com",
 		"servicenetworking.googleapis.com",
-		"vpcaccess.googleapis.com",
 	}
 
 	enabled, err := g.listEnabledAPIs(ctx)

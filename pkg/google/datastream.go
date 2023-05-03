@@ -259,7 +259,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		return nil
 	}
 
-	host, port, err := g.getProxyIPAndPort(ctx)
+	host, err := g.getProxyIP(ctx)
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		fmt.Sprintf("--postgresql-hostname=%v", host),
 		fmt.Sprintf("--postgresql-username=%v", g.User),
 		fmt.Sprintf("--postgresql-password=%v", g.Password),
-		fmt.Sprintf("--postgresql-port=%v", port),
+		"--postgresql-port=5432",
 	}, nil)
 	if err != nil {
 		return err
