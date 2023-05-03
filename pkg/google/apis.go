@@ -6,7 +6,6 @@ import (
 )
 
 func (g *Google) EnableAPIs(ctx context.Context) error {
-	// annet sted
 	apis := []string{
 		"bigquery.googleapis.com",
 		"compute.googleapis.com",

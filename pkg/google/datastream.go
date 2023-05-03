@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
-	"github.com/navikt/nada-datastream/cmd"
 	"google.golang.org/api/iterator"
 )
 
@@ -58,6 +57,7 @@ func (g *Google) CreateStream(ctx context.Context) error {
 	}
 	defer deleteTempFile(bqConfig)
 
+	g.log.Info("Creating datastream...")
 	err = g.performRequest(ctx, []string{
 		"datastream",
 		"streams",
@@ -158,26 +158,6 @@ func (g *Google) createDatastreamFirewallRule(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) updateDatastreamFirewallRule(ctx context.Context, cfg *cmd.Config) error {
-	_, err := g.datastreamFirewallRuleExists(ctx)
-	if err != nil {
-		return err
-	}
-
-	err = g.performRequest(ctx, []string{
-		"compute",
-		"firewall-rules",
-		"update",
-		firewallRuleName,
-		fmt.Sprintf("--allow=tcp:%v", "5432-"+cfg.Port),
-	}, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (g *Google) waitForPrivateConnectionUp(ctx context.Context) error {
 	type privateConnection struct {
 		Name  string `json:"name"`
@@ -259,7 +239,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 		return nil
 	}
 
-	host, err := g.getProxyIP(ctx)
+	host, err := g.getProxyIP(ctx, proxyVMNamePrefix+g.DB)
 	if err != nil {
 		return err
 	}

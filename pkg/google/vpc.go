@@ -6,8 +6,7 @@ import (
 
 // global config annet sted?
 const (
-	vpcName          = "datastream-vpc"
-	addressRangeName = "datastream-cloudsql"
+	vpcName = "datastream-vpc"
 )
 
 func (g *Google) CreateVPC(ctx context.Context) error {

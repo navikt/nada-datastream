@@ -204,7 +204,7 @@ func (g *Google) cloudSQLProxyExists(ctx context.Context, proxyVMName string) (b
 	return false, nil
 }
 
-func (g *Google) getProxyIP(ctx context.Context) (string, error) {
+func (g *Google) getProxyIP(ctx context.Context, vmName string) (string, error) {
 	type DBInstance struct {
 		NetworkInterfaces []struct {
 			Network   string `json:"network"`
@@ -220,7 +220,7 @@ func (g *Google) getProxyIP(ctx context.Context) (string, error) {
 		"compute",
 		"instances",
 		"describe",
-		"datastream",
+		vmName,
 		"--zone=europe-north1-b",
 	}, &instance)
 	if err != nil {
