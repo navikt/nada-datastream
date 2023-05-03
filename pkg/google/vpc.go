@@ -24,10 +24,6 @@ func (g *Google) CreateVPC(ctx context.Context) error {
 		return err
 	}
 
-	if err := g.enablePrivateGoogleAccessForVMSubnet(ctx); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -66,24 +62,6 @@ func (g *Google) createVPC(ctx context.Context) error {
 	}, nil)
 	if err != nil {
 		g.log.WithError(err).Errorf("creating vpc %v", vpcName)
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) enablePrivateGoogleAccessForVMSubnet(ctx context.Context) error {
-	g.log.Info("Enabling Private Google Access...")
-	err := g.performRequest(ctx, []string{
-		"compute",
-		"networks",
-		"subnets",
-		"update",
-		vpcName,
-		fmt.Sprintf("--region=%v", g.Region),
-		"--enable-private-ip-google-access",
-	}, nil)
-	if err != nil {
 		return err
 	}
 
