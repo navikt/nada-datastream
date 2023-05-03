@@ -37,41 +37,6 @@ func (g *Google) CreateCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error
 	return nil
 }
 
-func (g *Google) checkCloudSQLInstanceStatus(ctx context.Context) (bool, error) {
-	instances := []*sqlInstance{}
-
-	err := g.performRequest(ctx, []string{
-		"sql",
-		"instances",
-		"list",
-	}, &instances)
-	if err != nil {
-		return false, err
-	}
-
-	for _, i := range instances {
-		if i.Name == g.Instance {
-			if g.hasPrivateIP(i.IpAddresses) {
-				return true, nil
-			} else {
-				return false, nil
-			}
-		}
-	}
-
-	return false, fmt.Errorf("no cloudsql instance with name %v in project %v", g.Instance, g.Project)
-}
-
-func (g *Google) hasPrivateIP(ipAddresses []map[string]string) bool {
-	for _, ip := range ipAddresses {
-		if ip["type"] == "PRIVATE" {
-			return true
-		}
-	}
-
-	return false
-}
-
 func (g *Google) createSAIfNotExists(ctx context.Context) error {
 	exists, err := g.saExists(ctx)
 	if err != nil {

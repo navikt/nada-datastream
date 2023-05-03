@@ -2,7 +2,6 @@ package google
 
 import (
 	"context"
-	"fmt"
 )
 
 // global config annet sted?
@@ -66,112 +65,6 @@ func (g *Google) createVPC(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (g *Google) createAddressRange(ctx context.Context) error {
-	exists, err := g.addressRangeExists(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
-	g.log.Info("Creating private address range for cloudsql...")
-	err = g.performRequest(ctx, []string{
-		"compute",
-		"addresses",
-		"create",
-		addressRangeName,
-		"--global",
-		"--purpose=VPC_PEERING",
-		"--prefix-length=24",
-		fmt.Sprintf("--network=%v", vpcName),
-	}, nil)
-	if err != nil {
-		g.log.WithError(err).Errorf("creating private address range for cloudsql instance", g.Instance)
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) addressRangeExists(ctx context.Context) (bool, error) {
-	type AddressRange struct {
-		Name string `json:"name"`
-	}
-	addressRanges := []*AddressRange{}
-
-	err := g.performRequest(ctx, []string{
-		"compute",
-		"addresses",
-		"list",
-	}, &addressRanges)
-	if err != nil {
-		g.log.WithError(err).Errorf("listing addresses in project %v", g.Project)
-		return false, err
-	}
-
-	for _, ar := range addressRanges {
-		if ar.Name == addressRangeName {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (g *Google) createPeering(ctx context.Context) error {
-	exists, err := g.peeringExists(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
-	g.log.Info("Create peering between VPC and cloudsql private range...")
-	err = g.performRequest(ctx, []string{
-		"services",
-		"vpc-peerings",
-		"update",
-		"--service=servicenetworking.googleapis.com",
-		fmt.Sprintf("--network=%v", vpcName),
-		fmt.Sprintf("--ranges=%v", addressRangeName),
-		"--force",
-	}, nil)
-	if err != nil {
-		g.log.WithError(err).Errorf("creating peering between VPC %v and cloudsql private range %v", vpcName, addressRangeName)
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) peeringExists(ctx context.Context) (bool, error) {
-	type peeringRes struct {
-		ReservedPeeringRanges []string `json:"reservedPeeringRanges"`
-	}
-	peerings := []*peeringRes{}
-
-	err := g.performRequest(ctx, []string{
-		"services",
-		"vpc-peerings",
-		"list",
-		fmt.Sprintf("--network=%v", vpcName),
-	}, &peerings)
-	if err != nil {
-		g.log.WithError(err).Errorf("listing peerings for VPC %v", vpcName)
-		return false, err
-	}
-
-	for _, p := range peerings {
-		if contains(p.ReservedPeeringRanges, addressRangeName) {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func contains(vals []string, val string) bool {

@@ -41,10 +41,6 @@ var create = &cobra.Command{
 		if replicationSlot != "" {
 			cfg.ReplicationSlot = replicationSlot
 		}
-		cloudsqlPrivateIP := viper.GetBool(dsCmd.UseCloudSQLPrivateIP)
-		if cloudsqlPrivateIP {
-			cfg.CloudSQLPrivateIP = cloudsqlPrivateIP
-		}
 
 		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, namespace, context, log)
 		if err != nil {
@@ -71,8 +67,6 @@ func init() {
 	viper.BindPFlag(dsCmd.ReplicationSlotName, create.PersistentFlags().Lookup(dsCmd.ReplicationSlotName))
 	create.PersistentFlags().String(dsCmd.PublicationName, "", "name the of publication in database (defaults to 'ds_publication')")
 	viper.BindPFlag(dsCmd.PublicationName, create.PersistentFlags().Lookup(dsCmd.PublicationName))
-	create.PersistentFlags().Bool(dsCmd.UseCloudSQLPrivateIP, false, "configure private IP for postgres instance and vpc peering (defaults to using public IP)")
-	viper.BindPFlag(dsCmd.UseCloudSQLPrivateIP, create.PersistentFlags().Lookup(dsCmd.UseCloudSQLPrivateIP))
 
 	rootCmd.AddCommand(create)
 }

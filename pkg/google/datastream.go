@@ -56,7 +56,7 @@ func (g *Google) CreateStream(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer deleteTempFile(pgConfig)
+	defer deleteTempFile(bqConfig)
 
 	err = g.performRequest(ctx, []string{
 		"datastream",

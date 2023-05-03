@@ -13,17 +13,15 @@ type DBConfig struct {
 type Config struct {
 	*DBConfig
 
-	CloudSQLPrivateIP bool
-	ExcludeTables     []string
-	ReplicationSlot   string
-	Publication       string
+	ExcludeTables   []string
+	ReplicationSlot string
+	Publication     string
 }
 
 const (
-	Namespace            = "namespace"
-	Context              = "context"
-	ExcludeTables        = "exclude-tables"
-	ReplicationSlotName  = "replication-slot"
-	PublicationName      = "publication-name"
-	UseCloudSQLPrivateIP = "cloudsql-private-ip"
+	Namespace           = "namespace"
+	Context             = "context"
+	ExcludeTables       = "exclude-tables"
+	ReplicationSlotName = "replication-slot"
+	PublicationName     = "publication-name"
 )
