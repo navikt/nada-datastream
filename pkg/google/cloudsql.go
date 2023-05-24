@@ -11,6 +11,7 @@ import (
 const (
 	proxyVMNamePrefix      = "datastream-"
 	cloudsqlContainerImage = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine"
+	machineType            = "g1-small"
 )
 
 type sqlInstance struct {
@@ -163,7 +164,7 @@ func (g *Google) createCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error
 		"instances",
 		"create-with-container",
 		proxyVMName,
-		"--machine-type=f1-micro",
+		fmt.Sprintf("--machine-type=%v", machineType),
 		"--zone=europe-north1-b",
 		fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
 		"--create-disk=image-project=debian-cloud,image-family=debian-11",
