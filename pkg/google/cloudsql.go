@@ -240,3 +240,53 @@ func (g *Google) getProxyIP(ctx context.Context, vmName string) (string, error) 
 
 	return "", fmt.Errorf("datastream compute instance does not have expected network interface %v", vpcName)
 }
+
+func (g *Google) DeleteCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
+	if err := g.removeSARoles(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deleteSA(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deleteCloudSQLProxy(ctx, cfg); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g *Google) deleteCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
+	proxyVMName := proxyVMNamePrefix + cfg.DB
+
+	g.log.Infof("Deleting CloudSQL proxy VM...")
+	return g.performRequest(ctx, []string{
+		"compute",
+		"instances",
+		"delete",
+		proxyVMName,
+		"--zone=europe-north1-b",
+	}, nil)
+}
+
+func (g *Google) removeSARoles(ctx context.Context) error {
+	g.log.Infof("Remove CloudSQL Client role with VM service account...")
+	return g.performRequest(ctx, []string{
+		"projects",
+		"remove-iam-policy-binding",
+		g.Project,
+		fmt.Sprintf("--member=serviceAccount:datastream@%v.iam.gserviceaccount.com", g.Project),
+		"--role=roles/cloudsql.client",
+	}, nil)
+}
+
+func (g *Google) deleteSA(ctx context.Context) error {
+	g.log.Infof("Deleting IAM service account for VM...")
+	return g.performRequest(ctx, []string{
+		"iam",
+		"service-accounts",
+		"delete",
+		"datastream",
+	}, nil)
+}

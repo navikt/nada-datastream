@@ -75,3 +75,13 @@ func contains(vals []string, val string) bool {
 
 	return false
 }
+
+func (g *Google) DeleteVPC(ctx context.Context) error {
+	g.log.Info("Deleting VPC...")
+	return g.performRequest(ctx, []string{
+		"compute",
+		"networks",
+		"delete",
+		vpcName,
+	}, nil)
+}

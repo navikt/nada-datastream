@@ -52,3 +52,29 @@ func Create(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
 
 	return nil
 }
+
+func Delete(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
+	googleClient := google.New(log.WithField("subsystem", "google"), cfg)
+
+	if err := googleClient.DeleteStream(ctx); err != nil {
+		return err
+	}
+
+	if err := googleClient.DeleteDatastreamProfiles(ctx); err != nil {
+		return err
+	}
+
+	if err := googleClient.DeleteDatastreamPrivateConnection(ctx); err != nil {
+		return err
+	}
+
+	if err := googleClient.DeleteCloudSQLProxy(ctx, cfg); err != nil {
+		return err
+	}
+
+	if err := googleClient.DeleteVPC(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}

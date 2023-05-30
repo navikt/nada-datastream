@@ -479,3 +479,86 @@ func deleteTempFile(file string) {
 		panic(err)
 	}
 }
+
+func (g *Google) DeleteStream(ctx context.Context) error {
+	streamName := fmt.Sprintf("postgres-%v-bigquery", g.DB)
+
+	g.log.Info("Deleting datastream...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"streams",
+		"delete",
+		streamName,
+		fmt.Sprintf("--location=%v", g.Region),
+	}, nil)
+}
+
+func (g *Google) DeleteDatastreamProfiles(ctx context.Context) error {
+	if err := g.deletePostgresProfile(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deleteBigqueryProfile(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g *Google) deletePostgresProfile(ctx context.Context) error {
+	profileName := fmt.Sprintf("postgres-%v", g.DB)
+
+	g.log.Infof("Deleting Datastream postgres profile...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"connection-profiles",
+		"delete",
+		profileName,
+		fmt.Sprintf("--location=%v", g.Region),
+	}, nil)
+}
+
+func (g *Google) deleteBigqueryProfile(ctx context.Context) error {
+	profileName := fmt.Sprintf("bigquery-%v", g.DB)
+
+	g.log.Infof("Deleting Datastream Bigquery profile...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"connection-profiles",
+		"delete",
+		profileName,
+	}, nil)
+}
+
+func (g *Google) DeleteDatastreamPrivateConnection(ctx context.Context) error {
+	if err := g.deleteDatastreamFirewallRule(ctx); err != nil {
+		return err
+	}
+
+	if err := g.deletePrivateConnection(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (g *Google) deletePrivateConnection(ctx context.Context) error {
+	g.log.Infof("Deleting Datastream private connection...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"private-connections",
+		"delete",
+		privateConnectionName,
+		fmt.Sprintf("--location=%v", g.Region),
+	}, nil)
+}
+
+func (g *Google) deleteDatastreamFirewallRule(ctx context.Context) error {
+	g.log.Infof("Deleting Datastream vpc firewall rule...")
+	return g.performRequest(ctx, []string{
+		"compute",
+		"firewall-rules",
+		"delete",
+		firewallRuleName,
+	}, nil)
+}
