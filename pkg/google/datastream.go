@@ -506,6 +506,7 @@ func (g *Google) DeleteStream(ctx context.Context) error {
 		"delete",
 		streamName,
 		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
 	}, nil)
 }
 
@@ -531,6 +532,7 @@ func (g *Google) deletePostgresProfile(ctx context.Context) error {
 		"delete",
 		profileName,
 		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
 	}, nil)
 }
 
@@ -543,6 +545,8 @@ func (g *Google) deleteBigqueryProfile(ctx context.Context) error {
 		"connection-profiles",
 		"delete",
 		profileName,
+		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
 	}, nil)
 }
 
@@ -570,6 +574,8 @@ func (g *Google) deletePrivateConnection(ctx context.Context) error {
 		"delete",
 		privateConnectionName,
 		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
+		"--force",
 	}, nil)
 }
 
@@ -580,5 +586,6 @@ func (g *Google) deleteDatastreamFirewallRule(ctx context.Context) error {
 		"firewall-rules",
 		"delete",
 		firewallRuleName,
+		"--quiet",
 	}, nil)
 }

@@ -1,13 +1,14 @@
 package cmd
 
 type DBConfig struct {
-	Project  string
-	Region   string
-	Instance string
-	DB       string
-	User     string
-	Password string
-	Port     string
+	Project   string
+	Region    string
+	Instance  string
+	DB        string
+	User      string
+	Password  string
+	Port      string
+	Namespace string
 }
 
 type Config struct {

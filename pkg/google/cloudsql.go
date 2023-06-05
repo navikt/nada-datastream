@@ -55,6 +55,10 @@ func (g *Google) createSAIfNotExists(ctx context.Context) error {
 	return nil
 }
 
+func (g *Google) SAID() string {
+	return fmt.Sprintf("datastream@%v.iam.gserviceaccount.com", g.Project)
+}
+
 func (g *Google) saExists(ctx context.Context) (bool, error) {
 	type SA struct {
 		Email string `json:"email"`
@@ -71,7 +75,7 @@ func (g *Google) saExists(ctx context.Context) (bool, error) {
 	}
 
 	for _, sa := range sas {
-		if sa.Email == fmt.Sprintf("datastream@%v.iam.gserviceaccount.com", g.Project) {
+		if sa.Email == g.SAID() {
 			return true, nil
 		}
 	}
@@ -243,6 +247,10 @@ func (g *Google) getProxyIP(ctx context.Context, vmName string) (string, error) 
 }
 
 func (g *Google) DeleteCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
+	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
+		return err
+	}
+
 	if err := g.removeSARoles(ctx); err != nil {
 		return err
 	}
@@ -268,6 +276,7 @@ func (g *Google) deleteCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error
 		"delete",
 		proxyVMName,
 		"--zone=europe-north1-b",
+		"--quiet",
 	}, nil)
 }
 
@@ -283,6 +292,7 @@ func (g *Google) removeSARoles(ctx context.Context) error {
 		g.Project,
 		fmt.Sprintf("--member=serviceAccount:datastream@%v.iam.gserviceaccount.com", g.Project),
 		"--role=roles/cloudsql.client",
+		"--condition=None",
 	}, nil)
 }
 
@@ -296,6 +306,6 @@ func (g *Google) deleteSA(ctx context.Context) error {
 		"iam",
 		"service-accounts",
 		"delete",
-		"datastream",
+		g.SAID(),
 	}, nil)
 }

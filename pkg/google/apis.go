@@ -36,6 +36,39 @@ func (g *Google) EnableAPIs(ctx context.Context) error {
 	return nil
 }
 
+func (g *Google) DisableDatastreamAPIs(ctx context.Context) error {
+	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
+		return err
+	}
+
+	apis := []string{
+		"datastream.googleapis.com",
+	}
+
+	enabled, err := g.listEnabledAPIs(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, a := range apis {
+		if !contains(enabled, a) {
+			g.log.Infof("Disabling API %v...", a)
+			err := g.performRequest(ctx, []string{
+				"services",
+				"disable",
+				a,
+			}, nil)
+			if err != nil {
+				g.log.WithError(err).Errorf("disabling api %v", a)
+				return err
+			}
+		}
+	}
+
+	return nil
+
+}
+
 func (g *Google) listEnabledAPIs(ctx context.Context) ([]string, error) {
 	type api struct {
 		Name string `json:"name"`

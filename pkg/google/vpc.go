@@ -87,5 +87,6 @@ func (g *Google) DeleteVPC(ctx context.Context) error {
 		"networks",
 		"delete",
 		vpcName,
+		"--quiet",
 	}, nil)
 }
