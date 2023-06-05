@@ -77,6 +77,10 @@ func contains(vals []string, val string) bool {
 }
 
 func (g *Google) DeleteVPC(ctx context.Context) error {
+	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
+		return err
+	}
+
 	g.log.Info("Deleting VPC...")
 	return g.performRequest(ctx, []string{
 		"compute",

@@ -272,6 +272,10 @@ func (g *Google) deleteCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error
 }
 
 func (g *Google) removeSARoles(ctx context.Context) error {
+	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
+		return err
+	}
+
 	g.log.Infof("Remove CloudSQL Client role with VM service account...")
 	return g.performRequest(ctx, []string{
 		"projects",
@@ -283,6 +287,10 @@ func (g *Google) removeSARoles(ctx context.Context) error {
 }
 
 func (g *Google) deleteSA(ctx context.Context) error {
+	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
+		return err
+	}
+
 	g.log.Infof("Deleting IAM service account for VM...")
 	return g.performRequest(ctx, []string{
 		"iam",

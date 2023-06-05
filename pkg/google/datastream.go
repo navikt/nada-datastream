@@ -337,10 +337,11 @@ func (g *Google) profileExists(ctx context.Context, profileName string) (bool, e
 	return false, nil
 }
 
+type datastream struct {
+	Name string `json:"name"`
+}
+
 func (g *Google) streamExists(ctx context.Context, streamName string) (bool, error) {
-	type datastream struct {
-		Name string `json:"name"`
-	}
 	datastreams := []*datastream{}
 
 	err := g.performRequest(ctx, []string{
@@ -360,6 +361,21 @@ func (g *Google) streamExists(ctx context.Context, streamName string) (bool, err
 	}
 
 	return false, nil
+}
+
+func (g *Google) anyStreamExistis(ctx context.Context) (bool, error) {
+	datastreams := []*datastream{}
+
+	err := g.performRequest(ctx, []string{
+		"datastream",
+		"streams",
+		"list",
+		fmt.Sprintf("--location=%v", g.Region),
+	}, &datastreams)
+	if err != nil {
+		return false, err
+	}
+	return len(datastreams) > 0, nil
 }
 
 func (g *Google) createPostgresStreamConfig(ctx context.Context) (string, error) {
@@ -531,6 +547,10 @@ func (g *Google) deleteBigqueryProfile(ctx context.Context) error {
 }
 
 func (g *Google) DeleteDatastreamPrivateConnection(ctx context.Context) error {
+	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
+		return err
+	}
+
 	if err := g.deleteDatastreamFirewallRule(ctx); err != nil {
 		return err
 	}

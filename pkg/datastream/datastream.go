@@ -76,5 +76,9 @@ func Delete(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
 		return err
 	}
 
+	if err := googleClient.DisableDatastreamAPIs(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
