@@ -11,7 +11,7 @@ import (
 )
 
 func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string, log *logrus.Logger) (*cmd.DBConfig, error) {
-	log.Info("Henter datastream konfigurasjon...")
+	log.Info("Retrieving datastream configurations...")
 	k8sClient, err := k8s.New()
 	if err != nil {
 		log.Fatal(err)

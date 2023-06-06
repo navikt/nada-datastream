@@ -41,6 +41,7 @@ func (g *Google) DisableDatastreamAPIs(ctx context.Context) error {
 		return err
 	}
 
+	g.log.Info("Checking datastream API...")
 	apis := []string{
 		"datastream.googleapis.com",
 	}
@@ -51,12 +52,13 @@ func (g *Google) DisableDatastreamAPIs(ctx context.Context) error {
 	}
 
 	for _, a := range apis {
-		if !contains(enabled, a) {
+		if contains(enabled, a) {
 			g.log.Infof("Disabling API %v...", a)
 			err := g.performRequest(ctx, []string{
 				"services",
 				"disable",
 				a,
+				"--force",
 			}, nil)
 			if err != nil {
 				g.log.WithError(err).Errorf("disabling api %v", a)

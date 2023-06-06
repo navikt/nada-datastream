@@ -24,7 +24,6 @@ var delete = &cobra.Command{
 
 		namespace := viper.GetString(dsCmd.Namespace)
 		context := viper.GetString(dsCmd.Context)
-
 		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, namespace, context, log)
 		if err != nil {
 			return err
@@ -40,9 +39,5 @@ var delete = &cobra.Command{
 }
 
 func init() {
-	delete.PersistentFlags().StringP(dsCmd.Namespace, "n", "", "kubernetes namespace where the app is deployed (defaults to the one defined in kubeconfig)")
-	viper.BindPFlag(dsCmd.Namespace, delete.PersistentFlags().Lookup(dsCmd.Namespace))
-	delete.PersistentFlags().StringP(dsCmd.Context, "c", "", "kubernetes context where the app is deployed (defaults to the one defined in kubeconfig)")
-	viper.BindPFlag(dsCmd.Context, create.PersistentFlags().Lookup(dsCmd.Context))
 	rootCmd.AddCommand(delete)
 }

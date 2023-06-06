@@ -28,12 +28,12 @@ var create = &cobra.Command{
 
 		namespace := viper.GetString(dsCmd.Namespace)
 		context := viper.GetString(dsCmd.Context)
-		log.Info(namespace)
-		log.Info(context)
+
 		excluded := viper.GetString(dsCmd.ExcludeTables)
 		if excluded != "" {
 			cfg.ExcludeTables = strings.Split(excluded, ",")
 		}
+
 		publication := viper.GetString(dsCmd.PublicationName)
 		if publication != "" {
 			cfg.Publication = publication
@@ -58,10 +58,6 @@ var create = &cobra.Command{
 }
 
 func init() {
-	create.PersistentFlags().StringP(dsCmd.Namespace, "n", "", "kubernetes namespace where the app is deployed (defaults to the one defined in kubeconfig)")
-	viper.BindPFlag(dsCmd.Namespace, create.PersistentFlags().Lookup(dsCmd.Namespace))
-	create.PersistentFlags().StringP(dsCmd.Context, "c", "", "kubernetes context where the app is deployed (defaults to the one defined in kubeconfig)")
-	viper.BindPFlag(dsCmd.Context, create.PersistentFlags().Lookup(dsCmd.Context))
 	create.PersistentFlags().String(dsCmd.ExcludeTables, "", "comma separated list of tables in postgres db that should be excluded from the datastream")
 	viper.BindPFlag(dsCmd.ExcludeTables, create.PersistentFlags().Lookup(dsCmd.ExcludeTables))
 	create.PersistentFlags().String(dsCmd.ReplicationSlotName, "", "name the of replication slot in database (defaults to 'ds_replication')")
