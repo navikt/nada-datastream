@@ -21,8 +21,6 @@ func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string
 	if err != nil {
 		return nil, err
 	}
-
-	cfg.Namespace = namespace
 	return &cfg, nil
 }
 
