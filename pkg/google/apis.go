@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (g *Google) EnableAPIs(ctx context.Context) error {
+func (g Google) EnableAPIs(ctx context.Context) error {
 	apis := []string{
 		"bigquery.googleapis.com",
 		"compute.googleapis.com",
@@ -36,14 +36,34 @@ func (g *Google) EnableAPIs(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) DisableDatastreamAPIs(ctx context.Context) error {
-	if streamExists, err := g.anyStreamExistis(ctx); streamExists || err != nil {
-		return err
+func (g *Google) listEnabledAPIs(ctx context.Context) ([]string, error) {
+	type api struct {
+		Name string `json:"name"`
+	}
+	apis := []*api{}
+
+	err := g.performRequest(ctx, []string{
+		"services",
+		"list",
+		"--enabled",
+	}, &apis)
+	if err != nil {
+		return nil, err
 	}
 
+	apiNames := []string{}
+	for _, a := range apis {
+		parts := strings.Split(a.Name, "/")
+		apiNames = append(apiNames, parts[len(parts)-1])
+	}
+
+	return apiNames, nil
+}
+
+func (g Google) disableDatastreamAPIs(ctx context.Context, api string) error {
 	g.log.Info("Checking datastream API...")
 	apis := []string{
-		"datastream.googleapis.com",
+		api,
 	}
 
 	enabled, err := g.listEnabledAPIs(ctx)
@@ -68,29 +88,4 @@ func (g *Google) DisableDatastreamAPIs(ctx context.Context) error {
 	}
 
 	return nil
-
-}
-
-func (g *Google) listEnabledAPIs(ctx context.Context) ([]string, error) {
-	type api struct {
-		Name string `json:"name"`
-	}
-	apis := []*api{}
-
-	err := g.performRequest(ctx, []string{
-		"services",
-		"list",
-		"--enabled",
-	}, &apis)
-	if err != nil {
-		return nil, err
-	}
-
-	apiNames := []string{}
-	for _, a := range apis {
-		parts := strings.Split(a.Name, "/")
-		apiNames = append(apiNames, parts[len(parts)-1])
-	}
-
-	return apiNames, nil
 }
