@@ -247,24 +247,40 @@ func (g Google) createBigqueryProfile(ctx context.Context, profileName string) e
 
 func (g Google) profileExists(ctx context.Context, profileName string) (bool, error) {
 	type profile struct {
-		Name string `json:"name"`
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
 	}
-	profiles := []*profile{}
+	numReadyCheckRetries := 5
 
-	err := g.performRequest(ctx, []string{
-		"datastream",
-		"connection-profiles",
-		"list",
-		fmt.Sprintf("--location=%v", g.Region),
-	}, &profiles)
-	if err != nil {
-		return false, err
-	}
+OUTER:
+	for i := 0; i < numReadyCheckRetries; i++ {
+		profiles := []*profile{}
 
-	for _, p := range profiles {
-		if p.Name == fmt.Sprintf("projects/%v/locations/%v/connectionProfiles/%v", g.Project, g.Region, profileName) {
-			return true, nil
+		err := g.performRequest(ctx, []string{
+			"datastream",
+			"connection-profiles",
+			"list",
+			fmt.Sprintf("--location=%v", g.Region),
+		}, &profiles)
+		if err != nil {
+			return false, err
 		}
+
+		for _, p := range profiles {
+			if p.Name == fmt.Sprintf("projects/%v/locations/%v/connectionProfiles/%v", g.Project, g.Region, profileName) {
+				// Need this check as the connection profile is not necessarily ready when the list command returns a connection profile.
+				// The next step (create datastream) fails if the connection profiles are not ready.
+				// When the display name field is set to an non empty string, the connection profile is ready.
+				if p.DisplayName == "" {
+					g.log.Infof("Waiting for connection profile %v ready", profileName)
+					time.Sleep(30 * time.Second)
+					continue OUTER
+				}
+				return true, nil
+			}
+		}
+
+		return false, nil
 	}
 
 	return false, nil
@@ -309,8 +325,8 @@ func (g *Google) anyOtherStreamExistis(ctx context.Context) (bool, error) {
 		return false, err
 	}
 
-	var otherStream = 0
-	var stream = generateNameFunc[DATASTREAM](g)
+	otherStream := 0
+	stream := generateNameFunc[DATASTREAM](g)
 	for _, ds := range datastreams {
 		if ds.Name != stream {
 			otherStream++
