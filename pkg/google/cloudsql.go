@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/navikt/nada-datastream/cmd"
 )
 
 const (
 	proxyVMNamePrefix      = "datastream-"
 	cloudsqlContainerImage = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine"
 	machineType            = "g1-small"
+	serviceAccountName     = "datastream"
 )
 
 type sqlInstance struct {
@@ -22,40 +21,11 @@ type sqlInstance struct {
 	} `json:"settings"`
 }
 
-func (g *Google) CreateCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
-	if err := g.createSAIfNotExists(ctx); err != nil {
-		return err
-	}
-
-	if err := g.grantSARoles(ctx); err != nil {
-		return err
-	}
-
-	if err := g.createCloudSQLProxy(ctx, cfg); err != nil {
-		return err
-	}
-
-	return nil
+func (g *Google) SAID(sa string) string {
+	return fmt.Sprintf("%v@%v.iam.gserviceaccount.com", sa, g.Project)
 }
 
-func (g *Google) createSAIfNotExists(ctx context.Context) error {
-	exists, err := g.saExists(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
-	g.log.Infof("Creating IAM service account for VM...")
-	if err := g.createSA(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) saExists(ctx context.Context) (bool, error) {
+func (g Google) saExists(ctx context.Context, serviceAccount string) (bool, error) {
 	type SA struct {
 		Email string `json:"email"`
 	}
@@ -71,7 +41,7 @@ func (g *Google) saExists(ctx context.Context) (bool, error) {
 	}
 
 	for _, sa := range sas {
-		if sa.Email == fmt.Sprintf("datastream@%v.iam.gserviceaccount.com", g.Project) {
+		if sa.Email == g.SAID(serviceAccount) {
 			return true, nil
 		}
 	}
@@ -79,12 +49,21 @@ func (g *Google) saExists(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) createSA(ctx context.Context) error {
+func (g Google) createSAAndGrantRoles(ctx context.Context, serviceAccount string) error {
+	err := g.createSA(ctx, serviceAccount)
+	if err != nil {
+		return err
+	}
+
+	return g.grantSARoles(ctx, serviceAccount)
+}
+
+func (g Google) createSA(ctx context.Context, serviceAccount string) error {
 	err := g.performRequest(ctx, []string{
 		"iam",
 		"service-accounts",
 		"create",
-		"datastream",
+		serviceAccount,
 		`--description="Datastream service account"`,
 		"--display-name=datastream",
 	}, map[string]string{})
@@ -95,8 +74,8 @@ func (g *Google) createSA(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) grantSARoles(ctx context.Context) error {
-	exists, err := g.rolebindingsExist(ctx)
+func (g *Google) grantSARoles(ctx context.Context, serviceAccount string) error {
+	exists, err := g.rolebindingsExist(ctx, "roles/cloudsql.client")
 	if err != nil {
 		return err
 	}
@@ -109,7 +88,7 @@ func (g *Google) grantSARoles(ctx context.Context) error {
 		"projects",
 		"add-iam-policy-binding",
 		g.Project,
-		fmt.Sprintf("--member=serviceAccount:datastream@%v.iam.gserviceaccount.com", g.Project),
+		fmt.Sprintf("--member=serviceAccount:%v", g.SAID(serviceAccount)),
 		"--role=roles/cloudsql.client",
 		"--condition=None",
 	}, nil)
@@ -120,7 +99,7 @@ func (g *Google) grantSARoles(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
+func (g *Google) rolebindingsExist(ctx context.Context, role string) (bool, error) {
 	type iamPolicy struct {
 		Bindings struct {
 			Role string `json:"role"`
@@ -140,7 +119,7 @@ func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
 	}
 
 	for _, b := range iamPolicies {
-		if b.Bindings.Role == "roles/cloudsql.client" {
+		if b.Bindings.Role == role {
 			return true, nil
 		}
 	}
@@ -148,28 +127,21 @@ func (g *Google) rolebindingsExist(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) createCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error {
-	proxyVMName := proxyVMNamePrefix + cfg.DB
-	exists, err := g.cloudSQLProxyExists(ctx, proxyVMName)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
+func (g Google) createCloudSQLProxy(ctx context.Context, proxyName string) error {
 	g.log.Infof("Creating CloudSQL proxy VM...")
-	err = g.performRequest(ctx, []string{
+	said := g.SAID(generateNameFunc[SERVICE_ACCOUNT](&g))
+	vpcid := generateNameFunc[VPC](&g)
+	err := g.performRequest(ctx, []string{
 		"compute",
 		"instances",
 		"create-with-container",
-		proxyVMName,
+		proxyName,
 		fmt.Sprintf("--machine-type=%v", machineType),
 		"--zone=europe-north1-b",
-		fmt.Sprintf("--service-account=datastream@%v.iam.gserviceaccount.com", g.Project),
+		fmt.Sprintf("--service-account=%v", said),
 		"--create-disk=image-project=debian-cloud,image-family=debian-11",
 		"--scopes=cloud-platform",
-		fmt.Sprintf("--network-interface=network=%v,subnet=%v", vpcName, vpcName),
+		fmt.Sprintf("--network-interface=network=%v,subnet=%v", vpcid, vpcid),
 		fmt.Sprintf("--container-image=%v", cloudsqlContainerImage),
 		fmt.Sprintf(`--container-arg=%v:%v:%v?port=5432`, g.Project, g.Region, g.Instance),
 		`--container-arg=--address=0.0.0.0`,
@@ -181,7 +153,7 @@ func (g *Google) createCloudSQLProxy(ctx context.Context, cfg *cmd.Config) error
 	return nil
 }
 
-func (g *Google) cloudSQLProxyExists(ctx context.Context, proxyVMName string) (bool, error) {
+func (g Google) cloudSQLProxyExists(ctx context.Context, proxyVMName string) (bool, error) {
 	type ComputeInstance struct {
 		Name string `json:"name"`
 	}
@@ -240,4 +212,39 @@ func (g *Google) getProxyIP(ctx context.Context, vmName string) (string, error) 
 	}
 
 	return "", fmt.Errorf("datastream compute instance does not have expected network interface %v", vpcName)
+}
+
+func (g Google) deleteCloudSQLProxy(ctx context.Context, proxyVMName string) error {
+	g.log.Infof("Deleting CloudSQL proxy VM...")
+	return g.performRequest(ctx, []string{
+		"compute",
+		"instances",
+		"delete",
+		proxyVMName,
+		"--zone=europe-north1-b",
+		"--quiet",
+	}, nil)
+}
+
+func (g *Google) removeSARoles(ctx context.Context) error {
+	g.log.Infof("Remove CloudSQL Client role with VM service account...")
+	said := g.SAID(generateNameFunc[SERVICE_ACCOUNT](g))
+	return g.performRequest(ctx, []string{
+		"projects",
+		"remove-iam-policy-binding",
+		g.Project,
+		fmt.Sprintf("--member=serviceAccount:%v", said),
+		"--role=roles/cloudsql.client",
+		"--condition=None",
+	}, nil)
+}
+
+func (g Google) deleteSA(ctx context.Context, serviceAccount string) error {
+	g.log.Infof("Deleting IAM service account for VM...")
+	return g.performRequest(ctx, []string{
+		"iam",
+		"service-accounts",
+		"delete",
+		g.SAID(serviceAccount),
+	}, nil)
 }

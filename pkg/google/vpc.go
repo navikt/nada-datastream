@@ -9,27 +9,11 @@ const (
 	vpcName = "datastream-vpc"
 )
 
-func (g *Google) CreateVPC(ctx context.Context) error {
-	exists, err := g.vpcExists(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
-	if err := g.createVPC(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) vpcExists(ctx context.Context) (bool, error) {
-	type vpc struct {
+func (g Google) vpcExists(ctx context.Context, vpc string) (bool, error) {
+	type vpcType struct {
 		Name string `json:"name"`
 	}
-	vpcs := []*vpc{}
+	vpcs := []*vpcType{}
 
 	err := g.performRequest(ctx, []string{
 		"compute",
@@ -42,7 +26,7 @@ func (g *Google) vpcExists(ctx context.Context) (bool, error) {
 	}
 
 	for _, existing := range vpcs {
-		if existing.Name == vpcName {
+		if existing.Name == vpc {
 			return true, nil
 		}
 	}
@@ -50,16 +34,16 @@ func (g *Google) vpcExists(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) createVPC(ctx context.Context) error {
+func (g Google) createVPC(ctx context.Context, vpc string) error {
 	g.log.Info("Creating VPC...")
 	err := g.performRequest(ctx, []string{
 		"compute",
 		"networks",
 		"create",
-		vpcName,
+		vpc,
 	}, nil)
 	if err != nil {
-		g.log.WithError(err).Errorf("creating vpc %v", vpcName)
+		g.log.WithError(err).Errorf("creating vpc %v", vpc)
 		return err
 	}
 
@@ -74,4 +58,15 @@ func contains(vals []string, val string) bool {
 	}
 
 	return false
+}
+
+func (g Google) deleteVPC(ctx context.Context, vpc string) error {
+	g.log.Info("Deleting VPC...")
+	return g.performRequest(ctx, []string{
+		"compute",
+		"networks",
+		"delete",
+		vpc,
+		"--quiet",
+	}, nil)
 }

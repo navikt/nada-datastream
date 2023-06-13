@@ -19,32 +19,7 @@ const (
 	firewallRuleName      = "allow-datastream-cloudsql-proxy"
 )
 
-func (g *Google) CreateDatastreamPrivateConnection(ctx context.Context) error {
-	if err := g.createPrivateConnection(ctx); err != nil {
-		return err
-	}
-
-	if err := g.createDatastreamFirewallRule(ctx); err != nil {
-		return err
-	}
-
-	if err := g.waitForPrivateConnectionUp(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) CreateStream(ctx context.Context) error {
-	streamName := fmt.Sprintf("postgres-%v-bigquery", g.DB)
-	exists, err := g.streamExists(ctx, streamName)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
+func (g Google) createStream(ctx context.Context, streamName string) error {
 	pgConfig, err := g.createPostgresStreamConfig(ctx)
 	if err != nil {
 		return err
@@ -80,21 +55,13 @@ func (g *Google) CreateStream(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) createPrivateConnection(ctx context.Context) error {
-	exists, err := g.privateConnectionExists(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
+func (g Google) createPrivateConnection(ctx context.Context, connection string) error {
 	g.log.Infof("Creating Datastream private connection...")
-	err = g.performRequest(ctx, []string{
+	err := g.performRequest(ctx, []string{
 		"datastream",
 		"private-connections",
 		"create",
-		privateConnectionName,
+		connection,
 		fmt.Sprintf("--display-name=%v", privateConnectionName),
 		fmt.Sprintf("--vpc=%v", vpcName),
 		fmt.Sprintf("--subnet=%v", datastreamSubnet),
@@ -104,10 +71,14 @@ func (g *Google) createPrivateConnection(ctx context.Context) error {
 		return err
 	}
 
+	if err := g.waitForPrivateConnectionUp(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func (g *Google) privateConnectionExists(ctx context.Context) (bool, error) {
+func (g Google) privateConnectionExists(ctx context.Context, privateConnection string) (bool, error) {
 	type privateConn struct {
 		Name string `json:"name"`
 	}
@@ -124,7 +95,7 @@ func (g *Google) privateConnectionExists(ctx context.Context) (bool, error) {
 	}
 
 	for _, c := range privateCons {
-		if c.Name == fmt.Sprintf("projects/%v/locations/%v/privateConnections/%v", g.Project, g.Region, privateConnectionName) {
+		if c.Name == fmt.Sprintf("projects/%v/locations/%v/privateConnections/%v", g.Project, g.Region, privateConnection) {
 			return true, nil
 		}
 	}
@@ -132,16 +103,8 @@ func (g *Google) privateConnectionExists(ctx context.Context) (bool, error) {
 	return false, nil
 }
 
-func (g *Google) createDatastreamFirewallRule(ctx context.Context) error {
-	exists, err := g.datastreamFirewallRuleExists(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
-	err = g.performRequest(ctx, []string{
+func (g Google) createDatastreamFirewallRule(ctx context.Context, firewallRuleName string) error {
+	err := g.performRequest(ctx, []string{
 		"compute",
 		"firewall-rules",
 		"create",
@@ -193,11 +156,11 @@ func (g *Google) waitForPrivateConnectionUp(ctx context.Context) error {
 	}
 }
 
-func (g *Google) datastreamFirewallRuleExists(ctx context.Context) (bool, error) {
-	type firewallRule struct {
+func (g Google) datastreamFirewallRuleExists(ctx context.Context, firewallRule string) (bool, error) {
+	type firewallRuleType struct {
 		Name string `json:"name"`
 	}
-	firewallRules := []*firewallRule{}
+	firewallRules := []*firewallRuleType{}
 
 	err := g.performRequest(ctx, []string{
 		"compute",
@@ -209,7 +172,7 @@ func (g *Google) datastreamFirewallRuleExists(ctx context.Context) (bool, error)
 	}
 
 	for _, r := range firewallRules {
-		if r.Name == firewallRuleName {
+		if r.Name == firewallRule {
 			return true, nil
 		}
 	}
@@ -217,29 +180,8 @@ func (g *Google) datastreamFirewallRuleExists(ctx context.Context) (bool, error)
 	return false, nil
 }
 
-func (g *Google) CreateDatastreamProfiles(ctx context.Context) error {
-	if err := g.createPostgresProfile(ctx); err != nil {
-		return err
-	}
-
-	if err := g.createBigqueryProfile(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (g *Google) createPostgresProfile(ctx context.Context) error {
-	profileName := fmt.Sprintf("postgres-%v", g.DB)
-	exists, err := g.profileExists(ctx, profileName)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
-	host, err := g.getProxyIP(ctx, proxyVMNamePrefix+g.DB)
+func (g Google) createPostgresProfile(ctx context.Context, profileName string) error {
+	host, err := g.getProxyIP(ctx, generateNameFunc[SQL_PROXY](&g))
 	if err != nil {
 		return err
 	}
@@ -265,7 +207,7 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 	}
 
 	// creation of datastream profiles fails silently, so we must check whether the resource was created
-	exists, err = g.profileExists(ctx, profileName)
+	exists, err := g.profileExists(ctx, profileName)
 	if err != nil {
 		return err
 	}
@@ -276,18 +218,9 @@ func (g *Google) createPostgresProfile(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) createBigqueryProfile(ctx context.Context) error {
-	profileName := fmt.Sprintf("bigquery-%v", g.DB)
-	exists, err := g.profileExists(ctx, profileName)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-
+func (g Google) createBigqueryProfile(ctx context.Context, profileName string) error {
 	g.log.Infof("Creating Datastream Bigquery profile...")
-	err = g.performRequest(ctx, []string{
+	err := g.performRequest(ctx, []string{
 		"datastream",
 		"connection-profiles",
 		"create",
@@ -301,7 +234,7 @@ func (g *Google) createBigqueryProfile(ctx context.Context) error {
 	}
 
 	// creation of datastream profiles fails silently, so we must check whether the resource was created
-	exists, err = g.profileExists(ctx, profileName)
+	exists, err := g.profileExists(ctx, profileName)
 	if err != nil {
 		return err
 	}
@@ -312,7 +245,7 @@ func (g *Google) createBigqueryProfile(ctx context.Context) error {
 	return nil
 }
 
-func (g *Google) profileExists(ctx context.Context, profileName string) (bool, error) {
+func (g Google) profileExists(ctx context.Context, profileName string) (bool, error) {
 	type profile struct {
 		Name string `json:"name"`
 	}
@@ -337,10 +270,11 @@ func (g *Google) profileExists(ctx context.Context, profileName string) (bool, e
 	return false, nil
 }
 
-func (g *Google) streamExists(ctx context.Context, streamName string) (bool, error) {
-	type datastream struct {
-		Name string `json:"name"`
-	}
+type datastream struct {
+	Name string `json:"name"`
+}
+
+func (g Google) streamExists(ctx context.Context, streamName string) (bool, error) {
 	datastreams := []*datastream{}
 
 	err := g.performRequest(ctx, []string{
@@ -360,6 +294,29 @@ func (g *Google) streamExists(ctx context.Context, streamName string) (bool, err
 	}
 
 	return false, nil
+}
+
+func (g *Google) anyOtherStreamExistis(ctx context.Context) (bool, error) {
+	datastreams := []*datastream{}
+
+	err := g.performRequest(ctx, []string{
+		"datastream",
+		"streams",
+		"list",
+		fmt.Sprintf("--location=%v", g.Region),
+	}, &datastreams)
+	if err != nil {
+		return false, err
+	}
+
+	var otherStream = 0
+	var stream = generateNameFunc[DATASTREAM](g)
+	for _, ds := range datastreams {
+		if ds.Name != stream {
+			otherStream++
+		}
+	}
+	return otherStream > 0, nil
 }
 
 func (g *Google) createPostgresStreamConfig(ctx context.Context) (string, error) {
@@ -435,7 +392,7 @@ func (g *Google) createBigQueryStreamConfig(ctx context.Context) (string, error)
 	return file.Name(), nil
 }
 
-func (g *Google) datasetExists(ctx context.Context, datasetID string) (bool, error) {
+func (g Google) datasetExists(ctx context.Context, datasetID string) (bool, error) {
 	client, err := bigquery.NewClient(ctx, g.Project)
 	if err != nil {
 		return false, err
@@ -478,4 +435,91 @@ func deleteTempFile(file string) {
 	if err := os.RemoveAll(file); err != nil {
 		panic(err)
 	}
+}
+
+func (g Google) deleteStream(ctx context.Context, streamName string) error {
+	streamExist, err := g.streamExists(ctx, streamName)
+	if err != nil {
+		return err
+	}
+	if !streamExist {
+		g.log.Info("Datastream does not exist, so skip deletion")
+		return nil
+	}
+
+	g.log.Info("Deleting datastream...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"streams",
+		"delete",
+		streamName,
+		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
+	}, nil)
+}
+
+func (g Google) deletePostgresProfile(ctx context.Context, profileName string) error {
+	profileExist, err := g.profileExists(ctx, profileName)
+	if err != nil {
+		return err
+	}
+	if !profileExist {
+		g.log.Info(fmt.Sprintf("Connection profile %v does not exist, so skip deletion", profileName))
+		return nil
+	}
+
+	g.log.Infof("Deleting Datastream postgres profile...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"connection-profiles",
+		"delete",
+		profileName,
+		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
+	}, nil)
+}
+
+func (g Google) deleteBigqueryProfile(ctx context.Context, profileName string) error {
+	profileExist, err := g.profileExists(ctx, profileName)
+	if err != nil {
+		return err
+	}
+	if !profileExist {
+		g.log.Info(fmt.Sprintf("Connection profile %v does not exist, so skip deletion", profileName))
+		return nil
+	}
+
+	g.log.Infof("Deleting Datastream Bigquery profile...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"connection-profiles",
+		"delete",
+		profileName,
+		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
+	}, nil)
+}
+
+func (g Google) deletePrivateConnection(ctx context.Context, privateConnection string) error {
+	g.log.Infof("Deleting Datastream private connection...")
+	return g.performRequest(ctx, []string{
+		"datastream",
+		"private-connections",
+		"delete",
+		privateConnection,
+		fmt.Sprintf("--location=%v", g.Region),
+		"--quiet",
+		"--force",
+	}, nil)
+}
+
+func (g Google) deleteDatastreamFirewallRule(ctx context.Context, firewallRule string) error {
+	g.log.Infof("Deleting Datastream vpc firewall rule...")
+	return g.performRequest(ctx, []string{
+		"compute",
+		"firewall-rules",
+		"delete",
+		firewallRule,
+		"--quiet",
+	}, nil)
 }

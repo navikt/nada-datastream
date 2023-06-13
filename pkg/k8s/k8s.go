@@ -16,9 +16,9 @@ import (
 )
 
 type Client struct {
-	clientSet     *kubernetes.Clientset
-	dynamicClient *dynamic.DynamicClient
-	namespace     string
+	clientSet        *kubernetes.Clientset
+	dynamicClient    *dynamic.DynamicClient
+	defaultNamespace string
 }
 
 func New() (*Client, error) {
@@ -44,23 +44,27 @@ func New() (*Client, error) {
 	}
 
 	return &Client{
-		clientSet:     kubernetes.NewForConfigOrDie(config),
-		dynamicClient: dynamic.NewForConfigOrDie(config),
-		namespace:     namespace,
+		clientSet:        kubernetes.NewForConfigOrDie(config),
+		dynamicClient:    dynamic.NewForConfigOrDie(config),
+		defaultNamespace: namespace,
 	}, nil
 }
 
-func (c *Client) DBConfig(ctx context.Context, appName, dbUser string) (cmd.DBConfig, error) {
+func (c *Client) DBConfig(ctx context.Context, appName, dbUser string, namespace string) (cmd.DBConfig, error) {
+	if namespace == "" {
+		namespace = c.defaultNamespace
+	}
+
 	dbConf := cmd.DBConfig{
 		Port: "5432",
 	}
 
-	err := c.setDBInstanceInfo(ctx, appName, &dbConf)
+	err := c.setDBInstanceInfo(ctx, appName, &dbConf, namespace)
 	if err != nil {
 		return cmd.DBConfig{}, err
 	}
 
-	secrets, err := c.clientSet.CoreV1().Secrets(c.namespace).List(ctx, metav1.ListOptions{})
+	secrets, err := c.clientSet.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return cmd.DBConfig{}, err
 	}
@@ -84,12 +88,16 @@ func (c *Client) DBConfig(ctx context.Context, appName, dbUser string) (cmd.DBCo
 	return dbConf, nil
 }
 
-func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *cmd.DBConfig) error {
+func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *cmd.DBConfig, namespace string) error {
+	if namespace == "" {
+		namespace = c.defaultNamespace
+	}
+
 	sqlInstances, err := c.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "sql.cnrm.cloud.google.com",
 		Version:  "v1beta1",
 		Resource: "sqlinstances",
-	}).Namespace(c.namespace).List(ctx, metav1.ListOptions{
+	}).Namespace(namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "app=" + appName,
 	})
 	if err != nil {
@@ -97,9 +105,9 @@ func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *
 	}
 
 	if len(sqlInstances.Items) == 0 {
-		return fmt.Errorf("findDBInstance: no sqlinstance found for app %q in %q", appName, c.namespace)
+		return fmt.Errorf("findDBInstance: no sqlinstance found for app %q in %q", appName, namespace)
 	} else if len(sqlInstances.Items) > 1 {
-		return fmt.Errorf("findDBInstance: multiple sqlinstances found for app %q in %q", appName, c.namespace)
+		return fmt.Errorf("findDBInstance: multiple sqlinstances found for app %q in %q", appName, namespace)
 	}
 
 	sqlInstance := sqlInstances.Items[0]

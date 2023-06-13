@@ -10,45 +10,23 @@ import (
 )
 
 func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string, log *logrus.Logger) (*cmd.DBConfig, error) {
+	log.Info("Retrieving datastream configurations...")
 	k8sClient, err := k8s.New()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cfg, err := k8sClient.DBConfig(ctx, appName, dbUser)
+	cfg, err := k8sClient.DBConfig(ctx, appName, dbUser, namespace)
 	if err != nil {
 		return nil, err
 	}
-
 	return &cfg, nil
 }
 
 func Create(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
-	googleClient := google.New(log.WithField("subsystem", "google"), cfg)
+	return google.New(log.WithField("subsystem", "google"), cfg).CreateResources(ctx)
+}
 
-	if err := googleClient.EnableAPIs(ctx); err != nil {
-		return err
-	}
-
-	if err := googleClient.CreateVPC(ctx); err != nil {
-		return err
-	}
-
-	if err := googleClient.CreateCloudSQLProxy(ctx, cfg); err != nil {
-		return err
-	}
-
-	if err := googleClient.CreateDatastreamPrivateConnection(ctx); err != nil {
-		return err
-	}
-
-	if err := googleClient.CreateDatastreamProfiles(ctx); err != nil {
-		return err
-	}
-
-	if err := googleClient.CreateStream(ctx); err != nil {
-		return err
-	}
-
-	return nil
+func Delete(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
+	return google.New(log.WithField("subsystem", "google"), cfg).DeleteResources(ctx)
 }
