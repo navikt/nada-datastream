@@ -9,7 +9,7 @@ import (
 const (
 	proxyVMNamePrefix      = "datastream-"
 	cloudsqlContainerImage = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.1-alpine"
-	machineType            = "g1-small"
+	machineType            = "n1-standard-1"
 	serviceAccountName     = "datastream"
 )
 
