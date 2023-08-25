@@ -27,7 +27,6 @@ jobs:
           echo "version=1.$(date "+%Y%m%d%H%M%S")" >> ${GITHUB_OUTPUT}
 
   release:
-    if: ${{ github.ref == 'refs/heads/main' }}
     needs:
       - set-version
     runs-on: ubuntu-latest
