@@ -1,0 +1,28 @@
+project_name: nada-datastream
+
+builds:
+  - env: [ CGO_ENABLED=0 ]
+    targets:
+      - linux_amd64
+      - darwin_amd64
+    main: ./
+    binary: nada-datastream
+
+release:
+  github:
+    owner: navikt
+    name: nada-datastream
+
+checksum:
+  name_template: 'checksums.txt'
+
+brews:
+  - tap:
+      owner: navikt
+      name: homebrew-tap
+    name: nada-datastream
+    homepage: "https://github.com/navikt/nada-datastream"
+    description: "Description for nada-datastream"
+    folder: Formula
+    install: |
+      bin.install "nada-datastream"
