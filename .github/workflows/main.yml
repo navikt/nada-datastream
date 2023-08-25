@@ -1,0 +1,47 @@
+name: Build release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  set-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: set version
+        id: set-version
+        run: |
+          echo Faking a Semantic Version
+          echo "version=1.$(date "+%Y%m%d%H%M%S")" >> ${GITHUB_OUTPUT}
+
+  release:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    needs:
+      - set-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          distribution: goreleaser
+          version: v1.7.0
+          args: release -f .goreleaser.yml --rm-dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
