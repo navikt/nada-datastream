@@ -27,7 +27,6 @@ jobs:
           echo "version=1.$(date "+%Y%m%d%H%M%S")" >> ${GITHUB_OUTPUT}
 
   release:
-    if: ${{ github.ref == 'refs/heads/main' }}
     needs:
       - set-version
     runs-on: ubuntu-latest
@@ -36,6 +35,10 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Create tag
+        run: |
+          git tag ${{ needs.set-version.outputs.version }}
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
