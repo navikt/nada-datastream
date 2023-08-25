@@ -37,6 +37,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Create tag
+        run: |
+          git tag ${{ needs.set-version.outputs.version }}
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v4
         with:
