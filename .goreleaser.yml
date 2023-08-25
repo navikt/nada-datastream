@@ -15,14 +15,3 @@ release:
 
 checksum:
   name_template: 'checksums.txt'
-
-brews:
-  - tap:
-      owner: navikt
-      name: homebrew-tap
-    name: nada-datastream
-    homepage: "https://github.com/navikt/nada-datastream"
-    description: "Description for nada-datastream"
-    folder: Formula
-    install: |
-      bin.install "nada-datastream"
