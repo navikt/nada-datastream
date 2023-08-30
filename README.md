@@ -1,6 +1,10 @@
 # Nada Datastream
 Oppsett av datastream fra en cloudsql postgres database til bigquery.
 
+## Binær utgivelse
+[Nedlast binærfil](https://github.com/navikt/nada-datastream/releases)
+ Vi tilbyr binær for mac og linux, mens for Windows-brukere, vennligst bruk Linux-delsystemet og den Linux-baserte binærfilen.
+
 ## Forutsetninger for bruk
 Det er noen steg som må utføres på forhånd for å klargjøre postgres databasen for datastream. Først må man:
 
@@ -38,7 +42,6 @@ CREATE PUBLICATION "ds_publication" FOR ALL TABLES;
 SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('ds_replication', 'pgoutput');
 ````
 Merk: både appens bruker ("appnavn") og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
-NB: Det er i dag kun støtte for å kjøre scriptet på Mac.
 
 ## Sett opp datastream kobling
 Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Editor` rolle i prosjektet.
