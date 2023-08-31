@@ -25,6 +25,7 @@ spec:
       - name: mydatabase
         users:
         - name: datastream # ekstra databasebruker
+      diskAutoresize: true # Datastream bruker en del lagringsplass
 ... 
 ````
 
