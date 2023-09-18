@@ -94,6 +94,14 @@ var generateNameFunc map[string]func(*Google) string = map[string]func(*Google) 
 	},
 }
 
+func resourceListToString(resources []string) string {
+	listString := ""
+	for _, r := range resources {
+		listString += fmt.Sprintf("[%v] ", r)
+	}
+	return listString
+}
+
 func (g *Google) DeleteResources(ctx context.Context) error {
 	otherStream, err := g.anyOtherStreamExistis(ctx)
 	if err != nil {
@@ -115,24 +123,26 @@ func (g *Google) DeleteResources(ctx context.Context) error {
 	for i, k := range resources {
 
 		if isSharedGlobalResource[k] && otherStream {
-			g.log.Info(fmt.Sprintf("Other datastream(s) depends on resource [%v], skip deletion", k))
+			g.log.Infof("Other datastream(s) depends on resource [%v], skip deletion", k)
 			continue
 		}
 
 		exist, err := checkExistenceFunc[k](*g, ctx, generateNameFunc[k](g))
 		if err != nil {
-			g.log.Info(fmt.Sprintf("Terminated on error, following resource(s) has not been cleaned up: %v", resources[i:]))
+			g.log.Infof("Terminated on error, following resource(s) has not been cleaned up: %v",
+				resourceListToString(resources[i:]))
 			return err
 		}
 
 		if exist {
 			err = deleteResourceFunc[k](*g, ctx, generateNameFunc[k](g))
 			if err != nil {
-				g.log.Info(fmt.Sprintf("Terminated on error, following resource(s) has not been cleaned up: %v", resources[i:]))
+				g.log.Infof("Terminated on error, following resource(s) has not been cleaned up: %v",
+					resourceListToString(resources[i:]))
 				return err
 			}
 		} else {
-			g.log.Info(fmt.Sprintf("Resource [%v] does not exist, skip deletion", k))
+			g.log.Infof("Resource [%v] does not exist, skip deletion", k)
 		}
 	}
 	return nil
@@ -155,14 +165,12 @@ func (g *Google) CreateResources(ctx context.Context) error {
 		DATASTREAM,
 	}
 
-	for i, k := range resources {
-		exist, err := checkExistenceFunc[k](*g, ctx, generateNameFunc[k](g))
+	createdResources := []string{}
+	exist := false
+	for _, k := range resources {
+		exist, err = checkExistenceFunc[k](*g, ctx, generateNameFunc[k](g))
 		if err != nil {
-			if i != 0 {
-				g.log.Info(fmt.Sprintf("Teminated on error, following resource(s) may need to be cleaned up: %v", resources[0:i]))
-				//Should we do an auto cleanup?
-			}
-			return err
+			goto __error
 		}
 		if exist {
 			g.log.Info(fmt.Sprintf("Resource [%v] exists, skip creation", k))
@@ -170,11 +178,25 @@ func (g *Google) CreateResources(ctx context.Context) error {
 		}
 		err = createResourceFunc[k](*g, ctx, generateNameFunc[k](g))
 		if err != nil {
-			if i != 0 {
-				g.log.Info(fmt.Sprintf("Teminated on error, following resource(s) may need to be cleaned up: %v", resources[0:i]))
+			goto __error
+		}
+		createdResources = append([]string{k}, createdResources...)
+	}
+	return err
+
+__error:
+	g.log.Errorf("Failed to create datastream: %v", err)
+	if len(createdResources) > 0 {
+		g.log.Infof("Cleaning up...")
+		for _, k := range createdResources {
+			err = deleteResourceFunc[k](*g, ctx, generateNameFunc[k](g))
+			if err != nil {
+				g.log.Error(err)
+				g.log.Infof("Failed to delete [%v], and it has to be manually cleaned up.", k)
+			} else {
+				g.log.Infof("[%v] deleted", k)
 			}
-			return err
 		}
 	}
-	return nil
+	return err
 }

@@ -2,6 +2,7 @@ package root
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	dsCmd "github.com/navikt/nada-datastream/cmd"
@@ -16,6 +17,10 @@ var create = &cobra.Command{
 	Short: "Create a new datastream",
 	Long:  `Create a new datastream`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 2 {
+			return fmt.Errorf("Invalid number of arguments.")
+		}
+
 		ctx := context.Background()
 		log := logrus.New()
 		cfg := &dsCmd.Config{

@@ -24,9 +24,9 @@ func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string
 }
 
 func Create(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
-	return google.New(log.WithField("subsystem", "google"), cfg).CreateResources(ctx)
+	return google.New(log.WithFields(logrus.Fields{}), cfg).CreateResources(ctx)
 }
 
 func Delete(ctx context.Context, cfg *cmd.Config, log *logrus.Logger) error {
-	return google.New(log.WithField("subsystem", "google"), cfg).DeleteResources(ctx)
+	return google.New(log.WithFields(logrus.Fields{}), cfg).DeleteResources(ctx)
 }

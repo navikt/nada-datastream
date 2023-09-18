@@ -2,6 +2,7 @@ package root
 
 import (
 	"context"
+	"fmt"
 
 	dsCmd "github.com/navikt/nada-datastream/cmd"
 	"github.com/navikt/nada-datastream/pkg/datastream"
@@ -15,6 +16,10 @@ var delete = &cobra.Command{
 	Short: "Delete a datastream",
 	Long:  `Delete a datastream`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 2 {
+			return fmt.Errorf("Invalid number of arguments.")
+		}
+
 		ctx := context.Background()
 		log := logrus.New()
 		cfg := &dsCmd.Config{}
