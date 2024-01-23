@@ -340,7 +340,22 @@ func (g *Google) createPostgresStreamConfig(ctx context.Context) (string, error)
 	cfg["replicationSlot"] = g.ReplicationSlot
 	cfg["publication"] = g.Publication
 
-	if len(g.ExcludeTables) > 0 {
+	fmt.Println("include tables", g.IncludeTables)
+
+	if len(g.IncludeTables) > 0 {
+		tables := []map[string]string{}
+		for _, t := range g.IncludeTables {
+			tables = append(tables, map[string]string{"table": t})
+		}
+		cfg["includeObjects"] = map[string]any{
+			"postgresqlSchemas": []map[string]any{
+				{
+					"schema":           "public",
+					"postgresqlTables": tables,
+				},
+			},
+		}
+	} else if len(g.ExcludeTables) > 0 {
 		tables := []map[string]string{}
 		for _, t := range g.ExcludeTables {
 			tables = append(tables, map[string]string{"table": t})

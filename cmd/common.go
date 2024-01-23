@@ -14,6 +14,7 @@ type Config struct {
 	*DBConfig
 
 	ExcludeTables   []string
+	IncludeTables   []string
 	ReplicationSlot string
 	Publication     string
 }
@@ -21,6 +22,7 @@ type Config struct {
 const (
 	Namespace           = "namespace"
 	Context             = "context"
+	IncludeTables       = "include-tables"
 	ExcludeTables       = "exclude-tables"
 	ReplicationSlotName = "replication-slot"
 	PublicationName     = "publication-name"
