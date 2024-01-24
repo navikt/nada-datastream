@@ -67,6 +67,7 @@ Dersom man ikke spesifiserer noe vil alle tabeller i public schema i databasen i
 ````bash
 ./bin/nada-datastream create appnavn databasebruker --exclude-tables=tabell1,tabell2,tabell3
 ````
+Tilsvarende kan du også *inkludere* tabeller: Bruk da flagget `--include-tables`.
 
 For flagg se
 ```bash
