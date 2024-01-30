@@ -69,6 +69,10 @@ Dersom man ikke spesifiserer noe vil alle tabeller i public schema i databasen i
 ````
 Tilsvarende kan du også *inkludere* tabeller: Bruk da flagget `--include-tables`.
 
+Vi støtter kun inkludering eller eksludering av tabeller i datastream oppsettet, dersom begge flagg angis vil det være de inkluderte tabellene som gjelder og det som er angitt med `--exclude-tables` blir da ignorert.
+
+Vi støtter heller ikke spesifisering av kolonner for tabellene som datastreamen gjelder for. Dette kan riktignok enkelt settes opp manuelt gjennom [cloud console UIet](https://console.cloud.google.com/datastream/streams) etter at man har opprettet datastreamen. For å gjøre det gå til [datastream i cloud console](https://console.cloud.google.com/datastream/streams) -> Trykk inn på streamen -> `Edit` -> `Edit source configuration` -> `SELECT COLUMNS` for de inkluderte tabellene.
+
 For flagg se
 ```bash
 ./bin/nada-datastream create --help
