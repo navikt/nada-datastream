@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -64,12 +65,7 @@ func (c *Client) DBConfig(ctx context.Context, appName, dbUser string, namespace
 		return cmd.DBConfig{}, err
 	}
 
-	secrets, err := c.clientSet.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return cmd.DBConfig{}, err
-	}
-
-	dbSecret, err := getDBSecret(appName, dbUser, secrets)
+	dbSecret, err := c.getDBSecret(ctx, namespace, appName, dbUser)
 	if err != nil {
 		return cmd.DBConfig{}, err
 	}
@@ -129,17 +125,46 @@ func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *
 	return nil
 }
 
-func getDBSecret(appName, dbUser string, secrets *v1.SecretList) (v1.Secret, error) {
-	for _, s := range secrets.Items {
-		if isDBSecret(s.Name, appName, dbUser) {
-			return s, nil
+func (c *Client) getDBSecret(ctx context.Context, namespace, appName, dbUser string) (*v1.Secret, error) {
+	sqlUsers, err := c.dynamicClient.Resource(schema.GroupVersionResource{
+		Group:    "sql.cnrm.cloud.google.com",
+		Version:  "v1beta1",
+		Resource: "sqlusers",
+	}).Namespace(namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: "app=" + appName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("unable to find db secret for user %v", dbUser)
+	}
+
+	type object struct {
+		Spec struct {
+			Password struct {
+				ValueFrom struct {
+					SecretKeyRef struct {
+						Key  string `json:"key"`
+						Name string `json:"name"`
+					} `json:"secretKeyRef"`
+				} `json:"valueFrom"`
+			} `json:"password"`
+		} `json:"spec"`
+	}
+
+	for _, u := range sqlUsers.Items {
+		obj := object{}
+		dataBytes, err := u.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal(dataBytes, &obj); err != nil {
+			return nil, err
+		}
+
+		if strings.Contains(obj.Spec.Password.ValueFrom.SecretKeyRef.Key, strings.ToUpper(dbUser)) {
+			return c.clientSet.CoreV1().Secrets(namespace).Get(ctx, obj.Spec.Password.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
 		}
 	}
 
-	return v1.Secret{}, fmt.Errorf("unable to find db secret for user %v", dbUser)
-}
-
-func isDBSecret(secretName, appName, dbUser string) bool {
-	dbUser = strings.ReplaceAll(dbUser, "_", "-")
-	return strings.HasPrefix(secretName, "google-sql-"+appName) && strings.Contains(secretName, dbUser)
+	return nil, fmt.Errorf("unable to find db secret for user %v", dbUser)
 }
