@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -388,7 +389,7 @@ func (g *Google) createPostgresStreamConfig(ctx context.Context) (string, error)
 }
 
 func (g *Google) createBigQueryStreamConfig(ctx context.Context) (string, error) {
-	datasetID := "datastream_" + g.DB
+	datasetID := "datastream_" + strings.ReplaceAll(g.DB, "-", "_")
 	exists, err := g.datasetExists(ctx, datasetID)
 	if err != nil {
 		return "", err
