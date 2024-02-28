@@ -341,8 +341,6 @@ func (g *Google) createPostgresStreamConfig(ctx context.Context) (string, error)
 	cfg["replicationSlot"] = g.ReplicationSlot
 	cfg["publication"] = g.Publication
 
-	fmt.Println("include tables", g.IncludeTables)
-
 	if len(g.IncludeTables) > 0 {
 		tables := []map[string]string{}
 		for _, t := range g.IncludeTables {

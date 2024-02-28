@@ -29,7 +29,7 @@ var delete = &cobra.Command{
 
 		namespace := viper.GetString(dsCmd.Namespace)
 		context := viper.GetString(dsCmd.Context)
-		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, namespace, context, log)
+		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, context, namespace, log)
 		if err != nil {
 			return err
 		}

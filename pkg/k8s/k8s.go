@@ -17,17 +17,25 @@ import (
 )
 
 type Client struct {
-	clientSet        *kubernetes.Clientset
-	dynamicClient    *dynamic.DynamicClient
-	defaultNamespace string
+	clientSet     *kubernetes.Clientset
+	dynamicClient *dynamic.DynamicClient
+	namespace     string
 }
 
-func New() (*Client, error) {
-	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, nil)
+func New(context, namespace string) (*Client, error) {
+	kubeConfig, err := getKubeConfig(context, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	ns, _, err := kubeConfig.Namespace()
+	if err != nil {
+		return nil, err
+	}
+
 	config, err := kubeConfig.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("NewDBInfo: unable to get kubeconfig: %w", err)
+		return nil, err
 	}
 
 	config.AuthProvider = nil
@@ -39,33 +47,24 @@ func New() (*Client, error) {
 		InteractiveMode:    api.IfAvailableExecInteractiveMode,
 	}
 
-	namespace, _, err := kubeConfig.Namespace()
-	if err != nil {
-		return nil, fmt.Errorf("NewDBConfig: unable to get namespace: %w", err)
-	}
-
 	return &Client{
-		clientSet:        kubernetes.NewForConfigOrDie(config),
-		dynamicClient:    dynamic.NewForConfigOrDie(config),
-		defaultNamespace: namespace,
+		clientSet:     kubernetes.NewForConfigOrDie(config),
+		dynamicClient: dynamic.NewForConfigOrDie(config),
+		namespace:     ns,
 	}, nil
 }
 
-func (c *Client) DBConfig(ctx context.Context, appName, dbUser string, namespace string) (cmd.DBConfig, error) {
-	if namespace == "" {
-		namespace = c.defaultNamespace
-	}
-
+func (c *Client) DBConfig(ctx context.Context, appName, dbUser string) (cmd.DBConfig, error) {
 	dbConf := cmd.DBConfig{
 		Port: "5432",
 	}
 
-	err := c.setDBInstanceInfo(ctx, appName, &dbConf, namespace)
+	err := c.setDBInstanceInfo(ctx, appName, &dbConf)
 	if err != nil {
 		return cmd.DBConfig{}, err
 	}
 
-	dbSecret, err := c.getDBSecret(ctx, namespace, appName, dbUser)
+	dbSecret, err := c.getDBSecret(ctx, appName, dbUser)
 	if err != nil {
 		return cmd.DBConfig{}, err
 	}
@@ -84,16 +83,12 @@ func (c *Client) DBConfig(ctx context.Context, appName, dbUser string, namespace
 	return dbConf, nil
 }
 
-func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *cmd.DBConfig, namespace string) error {
-	if namespace == "" {
-		namespace = c.defaultNamespace
-	}
-
+func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *cmd.DBConfig) error {
 	sqlInstances, err := c.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "sql.cnrm.cloud.google.com",
 		Version:  "v1beta1",
 		Resource: "sqlinstances",
-	}).Namespace(namespace).List(ctx, metav1.ListOptions{
+	}).Namespace(c.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "app=" + appName,
 	})
 	if err != nil {
@@ -101,9 +96,9 @@ func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *
 	}
 
 	if len(sqlInstances.Items) == 0 {
-		return fmt.Errorf("findDBInstance: no sqlinstance found for app %q in %q", appName, namespace)
+		return fmt.Errorf("findDBInstance: no sqlinstance found for app %q in %q", appName, c.namespace)
 	} else if len(sqlInstances.Items) > 1 {
-		return fmt.Errorf("findDBInstance: multiple sqlinstances found for app %q in %q", appName, namespace)
+		return fmt.Errorf("findDBInstance: multiple sqlinstances found for app %q in %q", appName, c.namespace)
 	}
 
 	sqlInstance := sqlInstances.Items[0]
@@ -125,12 +120,12 @@ func (c *Client) setDBInstanceInfo(ctx context.Context, appName string, dbConf *
 	return nil
 }
 
-func (c *Client) getDBSecret(ctx context.Context, namespace, appName, dbUser string) (*v1.Secret, error) {
+func (c *Client) getDBSecret(ctx context.Context, appName, dbUser string) (*v1.Secret, error) {
 	sqlUsers, err := c.dynamicClient.Resource(schema.GroupVersionResource{
 		Group:    "sql.cnrm.cloud.google.com",
 		Version:  "v1beta1",
 		Resource: "sqlusers",
-	}).Namespace(namespace).List(ctx, metav1.ListOptions{
+	}).Namespace(c.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "app=" + appName,
 	})
 	if err != nil {
@@ -162,9 +157,43 @@ func (c *Client) getDBSecret(ctx context.Context, namespace, appName, dbUser str
 		}
 
 		if strings.Contains(obj.Spec.Password.ValueFrom.SecretKeyRef.Key, strings.ToUpper(dbUser)) {
-			return c.clientSet.CoreV1().Secrets(namespace).Get(ctx, obj.Spec.Password.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
+			return c.clientSet.CoreV1().Secrets(c.namespace).Get(ctx, obj.Spec.Password.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
 		}
 	}
 
 	return nil, fmt.Errorf("unable to find db secret for user %v", dbUser)
+}
+
+func getKubeConfig(context, namespace string) (clientcmd.ClientConfig, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, nil)
+
+	if context != "" || namespace != "" {
+		return replaceConfigDefaults(context, namespace, kubeConfig)
+	}
+
+	return kubeConfig, nil
+}
+
+func replaceConfigDefaults(context, namespace string, kubeConfig clientcmd.ClientConfig) (clientcmd.ClientConfig, error) {
+	apiConfig, err := kubeConfig.RawConfig()
+	if err != nil {
+		return kubeConfig, err
+	}
+
+	if context == "" {
+		context = apiConfig.CurrentContext
+	}
+
+	if namespace == "" {
+		namespace = apiConfig.Contexts[apiConfig.CurrentContext].Namespace
+	}
+
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{
+		CurrentContext: context,
+		Context: api.Context{
+			Namespace: namespace,
+		},
+	}), nil
 }

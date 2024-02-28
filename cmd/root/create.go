@@ -53,7 +53,7 @@ var create = &cobra.Command{
 			cfg.ReplicationSlot = replicationSlot
 		}
 
-		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, namespace, context, log)
+		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, context, namespace, log)
 		if err != nil {
 			return err
 		}

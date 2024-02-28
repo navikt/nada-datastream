@@ -9,14 +9,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func GetDBConfig(ctx context.Context, appName, dbUser, namespace, context string, log *logrus.Logger) (*cmd.DBConfig, error) {
+func GetDBConfig(ctx context.Context, appName, dbUser, context, namespace string, log *logrus.Logger) (*cmd.DBConfig, error) {
 	log.Info("Retrieving datastream configurations...")
-	k8sClient, err := k8s.New()
+	k8sClient, err := k8s.New(context, namespace)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	cfg, err := k8sClient.DBConfig(ctx, appName, dbUser, namespace)
+	cfg, err := k8sClient.DBConfig(ctx, appName, dbUser)
 	if err != nil {
 		return nil, err
 	}
