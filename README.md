@@ -5,6 +5,9 @@ Oppsett av datastream fra en cloudsql postgres database til bigquery.
 [Nedlast binærfil](https://github.com/navikt/nada-datastream/releases)
  Vi tilbyr binær for mac og linux, mens for Windows-brukere, vennligst bruk Linux-delsystemet og den Linux-baserte binærfilen.
 
+### Tillat binærfil fra uidentifisert utvikler på mac
+Hvis du jobber på mac må du tillate at den usignerte binærfilen skal kunne kjøres ellers vil det blokkeres. Følg [denne](https://www.macworld.com/article/672947/how-to-open-a-mac-app-from-an-unidentified-developer.html) oppskriften for dette.
+
 ## Forutsetninger for bruk
 Det er noen steg som må utføres på forhånd for å klargjøre postgres databasen for datastream. Først må man:
 
