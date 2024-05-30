@@ -45,7 +45,38 @@ ALTER USER "datastream" WITH REPLICATION;
 CREATE PUBLICATION "ds_publication" FOR ALL TABLES;
 SELECT PG_CREATE_LOGICAL_REPLICATION_SLOT('ds_replication', 'pgoutput');
 ````
-Merk: både appens bruker ("appnavn") og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
+*Merk*: både appens bruker ("appnavn") og den nye brukeren trenger å oppdateres med `REPLICATION` rollen i databasen over
+
+### Kjøre migrasjonen fra Flyway
+Dersom man skal kjøre migrasjonen fra Flyway, så må man gjøre gjøre `pg_create_logical_replication_slot` i en egen transaksjon.
+Ellers vil man få følgende feilmelding:
+> cannot create logical replication slot in transaction that has performed writes
+
+Eksempel på hvordan man kan gjøre det:
+```sql
+DO
+$$
+    BEGIN
+        IF EXISTS(SELECT * FROM pg_roles WHERE rolname = 'datastream') THEN
+            ALTER USER "appnavn" WITH REPLICATION;
+            CREATE PUBLICATION "ds_publication" FOR ALL TABLES;
+
+            ALTER DEFAULT PRIVILEGES IN SCHEMA PUBLIC GRANT SELECT ON TABLES TO "datastream";
+            GRANT SELECT ON ALL TABLES IN SCHEMA PUBLIC TO "datastream";
+            ALTER USER "datastream" WITH REPLICATION;
+        END IF;
+    END
+$$ LANGUAGE 'plpgsql';
+
+DO
+$$
+    BEGIN
+        IF EXISTS(SELECT * FROM pg_roles WHERE rolname = 'datastream') THEN
+            PERFORM PG_CREATE_LOGICAL_REPLICATION_SLOT('ds_replication', 'pgoutput');
+        END IF;
+    END
+$$ LANGUAGE 'plpgsql';
+```
 
 ## Sett opp datastream kobling
 Anbefaler at brukeren som skal kjøre oppsettet gir seg midlertidig `Project Editor` rolle i prosjektet.
