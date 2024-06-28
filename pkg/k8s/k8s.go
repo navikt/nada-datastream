@@ -129,7 +129,7 @@ func (c *Client) getDBSecret(ctx context.Context, appName, dbUser string) (*v1.S
 		LabelSelector: "app=" + appName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to find db secret for user %v", dbUser)
+		return nil, fmt.Errorf("unable to find secrets for app %v", appName)
 	}
 
 	type object struct {
@@ -156,7 +156,7 @@ func (c *Client) getDBSecret(ctx context.Context, appName, dbUser string) (*v1.S
 			return nil, err
 		}
 
-		if strings.Contains(obj.Spec.Password.ValueFrom.SecretKeyRef.Key, strings.ToUpper(dbUser)) {
+		if strings.Contains(obj.Spec.Password.ValueFrom.SecretKeyRef.Key, strings.ToUpper("_"+strings.ReplaceAll(dbUser, "-", "_"))+"_") {
 			return c.clientSet.CoreV1().Secrets(c.namespace).Get(ctx, obj.Spec.Password.ValueFrom.SecretKeyRef.Name, metav1.GetOptions{})
 		}
 	}

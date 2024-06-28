@@ -53,6 +53,9 @@ var create = &cobra.Command{
 			cfg.ReplicationSlot = replicationSlot
 		}
 
+		dataFreshness := viper.GetInt(dsCmd.DataFreshness)
+		cfg.DataFreshness = dataFreshness
+
 		dbCfg, err := datastream.GetDBConfig(ctx, appName, dbUser, context, namespace, log)
 		if err != nil {
 			return err
@@ -76,6 +79,8 @@ func init() {
 	viper.BindPFlag(dsCmd.ReplicationSlotName, create.PersistentFlags().Lookup(dsCmd.ReplicationSlotName))
 	create.PersistentFlags().String(dsCmd.PublicationName, "", "name the of publication in database (defaults to 'ds_publication')")
 	viper.BindPFlag(dsCmd.PublicationName, create.PersistentFlags().Lookup(dsCmd.PublicationName))
+	create.PersistentFlags().Int(dsCmd.DataFreshness, 900, "data freshness in seconds (how often data is fetched from database and stored in bigquery)")
+	viper.BindPFlag(dsCmd.DataFreshness, create.PersistentFlags().Lookup(dsCmd.DataFreshness))
 
 	rootCmd.AddCommand(create)
 }

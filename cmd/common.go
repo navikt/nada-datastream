@@ -17,6 +17,7 @@ type Config struct {
 	IncludeTables   []string
 	ReplicationSlot string
 	Publication     string
+	DataFreshness   int
 }
 
 const (
@@ -26,4 +27,5 @@ const (
 	ExcludeTables       = "exclude-tables"
 	ReplicationSlotName = "replication-slot"
 	PublicationName     = "publication-name"
+	DataFreshness       = "dataFreshness"
 )
