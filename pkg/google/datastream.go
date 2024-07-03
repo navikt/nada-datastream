@@ -402,7 +402,7 @@ func (g *Google) createBigQueryStreamConfig(ctx context.Context) (string, error)
 		"singleTargetDataset": map[string]string{
 			"datasetId": fmt.Sprintf("%v:%v", g.Project, datasetID),
 		},
-		"dataFreshness": "900s",
+		"dataFreshness": fmt.Sprintf("%ds", g.DataFreshness),
 	}
 
 	file, err := ioutil.TempFile("", "ds-bq-config")
