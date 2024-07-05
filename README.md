@@ -121,36 +121,9 @@ NB! krever gcloud versjon høyere enn 412.0.0, oppdater med `gcloud components u
 ## Fjerne datastream
 Når man ikke lenger trenger datastream, så er det viktig å rydde opp, slik at ikke postgres bruker ressurser på å opprettholde replication slot og publication.
 
-### Fjerne datastream
-
-Gå til https://console.cloud.google.com/datastream/streams huk av og velg Delete.
-
-![Remove datastream screenshot](remove_stream.png)
-
-Eller kjør tilsvarende kommandoer:
-```shell
-$ gcloud datastream streams list --location europe-north1
-NAME                          STATE    SOURCE                                                                                DESTINATION                                                                           CREATE_TIME                     UPDATE_TIME
-postgres-datastream-bigquery  RUNNING  projects/xxxx/locations/europe-north1/connectionProfiles/postgres-datastream  projects/xxxx/locations/europe-north1/connectionProfiles/bigquery-datastream  2024-05-14T12:20:52.617451721Z  2024-06-05T20:08:49.594245441Z
-
-$ gcloud datastream streams delete --location europe-north1 postgres-datastream-bigquery
-```
-
-### Fjerne connection profiles
-
-Gå til https://console.cloud.google.com/datastream/connection-profiles og velge profilene og trykke Delete
-![Remove connection profile screenshot](remove_cp.png)
-
-Eller kjør tilsvarende kommandoer:
-```shell
-$ gcloud datastream connection-profiles list --location europe-north1
-DISPLAY_NAME                     ID                                                                                                 TYPE        CREATED
-postgres-datastream              projects/nada-dev-db2e/locations/europe-north1/connectionProfiles/postgres-datastream              PostgreSQL  2024-05-14T12:19:45
-bigquery-datastream              projects/nada-dev-db2e/locations/europe-north1/connectionProfiles/bigquery-datastream              BigQuery    2024-05-14T12:20:48
-
-$ gcloud datastream connection-profiles delete --location europe-north1 postgres-datastream
-$ gcloud datastream connection-profiles delete --location europe-north1 bigquery-datastream 
-```
+````bash
+./bin/nada-datastream delete appnavn databasebruker
+````
 
 ### Rydde i databasen
 Som databaseowner:
