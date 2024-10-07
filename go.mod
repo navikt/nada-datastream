@@ -5,7 +5,7 @@ go 1.22.0
 toolchain go1.22.2
 
 require (
-	cloud.google.com/go/bigquery v1.63.0
+	cloud.google.com/go/bigquery v1.63.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
@@ -20,7 +20,7 @@ require (
 	cloud.google.com/go/auth v0.9.5 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.4 // indirect
 	cloud.google.com/go/compute/metadata v0.5.2 // indirect
-	cloud.google.com/go/iam v1.2.0 // indirect
+	cloud.google.com/go/iam v1.2.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
