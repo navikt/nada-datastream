@@ -5,11 +5,11 @@ go 1.24.0
 toolchain go1.24.1
 
 require (
-	cloud.google.com/go/bigquery v1.68.0
+	cloud.google.com/go/bigquery v1.69.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
-	google.golang.org/api v0.234.0
+	google.golang.org/api v0.235.0
 	k8s.io/api v0.33.1
 	k8s.io/apimachinery v0.33.1
 	k8s.io/client-go v0.33.1
