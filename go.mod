@@ -3,14 +3,14 @@ module github.com/navikt/nada-datastream
 go 1.26.0
 
 require (
-	cloud.google.com/go/bigquery v1.80.0
-	github.com/sirupsen/logrus v1.10.0
+	cloud.google.com/go/bigquery v1.81.0
+	github.com/sirupsen/logrus v1.10.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	google.golang.org/api v0.293.0
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
-	k8s.io/client-go v0.36.3
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
+	k8s.io/client-go v0.36.4
 )
 
 require (
