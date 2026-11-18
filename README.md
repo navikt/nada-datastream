@@ -1,3 +1,5 @@
+⚠️ Dette skriptet er arkivert. Vi oppfordrer heller til å bruke [terraform modulen](https://github.com/navikt/terraform-google-bigquery-datastream).
+
 # Nada Datastream
 Oppsett av datastream fra en cloudsql postgres database til bigquery.
 
